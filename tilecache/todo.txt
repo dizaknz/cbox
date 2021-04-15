@@ -1,0 +1,2 @@
+see http://osgeo-org.1803224.n2.nabble.com/Layer-scale-problem-with-Mercator-EPSG-900913-td2575585.html
+-DENABLE_VARIABLE_INCHES_PER_DEGREE
