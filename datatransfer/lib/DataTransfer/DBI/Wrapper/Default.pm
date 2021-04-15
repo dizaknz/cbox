@@ -1,0 +1,544 @@
+package DataTransfer::DBI::Wrapper::Default;
+
+=head1 NAME
+
+DataTransfer::DBI::Wrapper::Default - Any DB default implementation
+
+=cut
+
+use strict;
+use warnings;
+
+use Carp;
+use DBI::Const::GetInfoType;
+use Data::Dumper;
+
+our @CARP_NOT = qw(DataTransfer::Log::Logger);
+
+=head1 DESCRIPTION
+
+This is a special class with the ISA hierarchy administered by DBIx::AnyDBD.
+
+=head2 Methods
+
+=over
+
+=cut
+
+=item C<set_option>
+
+  Store a connection option.
+
+  $dbh->set_option($option, $value);
+
+=cut
+
+sub set_option ($$) {
+  my ($self, $option, $value) = @_;
+
+  $self->{options}{$option} = $value;
+}
+
+=item C<get_option>
+
+  Get the stored value for a specific connection option.
+
+  $dbh->get_option($option);
+
+=cut
+
+sub get_option ($) {
+  my ($self, $option) = @_;
+
+  return $self->{options}{$option};
+}
+
+=item C<describe>
+
+  Provide basic information about the current active database
+  connection.
+
+  $dbh->describe();
+
+=cut
+
+sub describe {
+    my $self = shift;
+
+    return sprintf("Database '%s': DBMS '%s', version '%s'",
+                   $self->{options}->{database},
+                   $self->get_info($GetInfoType{SQL_DBMS_NAME}) || '',
+                   $self->get_info($GetInfoType{SQL_DBMS_VER})  || '');
+}
+
+=item C<dsn>
+
+  Default DBI data source connection string.
+
+  $dbh->dsn($options);
+
+  where $options is reference to database connection hash
+
+=cut
+
+sub dsn ($) {
+  my ($self, $options) = @_;
+
+  unless (exists $options->{driver} && exists $options->{database}) {
+    get_option ('logger')->logdie ("Invalid database options: Require 'driver' and 'database'");
+  }
+
+  return $options->{driver} . ':' . $options->{database};
+}
+
+=item C<upsert>
+
+  Default implementation of an upsert, i.e. update if record exists; insert record if it doesn't
+
+  $dbh->upsert ($targetMapping, $sths, $sourceData);
+
+  where $targetMapping is a DataTransfer::Transfer::Congig->targetMapping() for table to perform upsert on
+        $sths          is a hash reference of prepare statement handles for each upsert action,
+        $sourceData    is a hash reference of source column and value
+
+=cut
+
+sub upsert ($$$$) {
+  my ($self, $targetMapping, $sths, $sourceData) = @_;
+
+  my $logger = $self->get_option('logger');
+
+  unless (ref $targetMapping eq 'HASH') {
+    $logger->fatal ("The target mapping from query to target columns is not a hash reference");
+    return;
+  }
+
+  my $table = $targetMapping->{table};
+  my $searchColumns = $targetMapping->{search_columns};
+
+  # remap target mapping into a map of target column => source 
+  my $columnMapping = {};
+
+  foreach my $mapping (@{$targetMapping->{mapping}}) {
+    $columnMapping->{$mapping->{to}} = { 
+      from       => $mapping->{from},
+      conversion => $mapping->{conversion}
+    };
+  }
+
+  # map primary keys into hash for quick lookup
+  my %autoColumns = map { $_ => 1 } @{$targetMapping->{auto_columns}};
+
+  # values for insert columns
+  my @value_args = ();
+  # values for update columns
+  my @update_args = ();
+
+  foreach my $key ( sort keys %$columnMapping ) {
+    my $conversion   = $columnMapping->{$key}->{conversion};
+    my $outputColumn = $key;
+    my $sourceColumn = $columnMapping->{$outputColumn}->{from};
+
+    if (ref ($sourceColumn) eq 'CODE') {
+      # execute code snippet and see what we have
+      my $q = &$sourceColumn;
+
+      # check whether code snippet produced a SQL select statement
+      if ($q =~ /\s*SELECT/) {
+        # execute the lookup query 
+        my $value = $self->lookupQuery ($q, $sourceData);
+
+        # add the lookup value
+        push @value_args, $value;
+      }
+      else {
+        push @value_args, $q;
+      }
+    }
+    else {
+      unless (exists $sourceData->{$sourceColumn}) {
+        $logger->logdie ("Source column=$sourceColumn not present in source query");
+      }
+                        
+      if ($conversion && ref ($conversion) eq 'CODE') {
+        # convert data from source to target data type
+        push @value_args, &$conversion($sourceData->{$sourceColumn});
+      }
+      else {
+        push @value_args, $sourceData->{$sourceColumn};
+      }
+    }
+
+    if (! exists $autoColumns{$outputColumn}) {
+      # not an auto generated column, add last value to update arguments
+      push @update_args, $value_args[$#value_args];
+    } 
+  }
+
+  # values for search columns
+  my @key_args = ();
+
+  # check if we have valid search columns, these are used to generate key search phrase
+  if ($searchColumns && $searchColumns->[0]) {
+    foreach my $searchColumn (sort @$searchColumns) {
+      if (ref ($searchColumn) eq 'CODE') {
+        # search column is a code snippet that produces SQL key lookup or key value
+        my $q = &$searchColumn;
+
+        # check whether code snippet produced a SQL select statement
+        if ($q =~ /\s*SELECT/) {
+          my $value = $self->lookupQuery ($q, $sourceData);
+        
+          push @key_args, $value;
+        }
+        else {
+          # add value generated by sub routine
+          push @key_args, $q;
+        }
+      }
+      else {
+        # lookup the source key column
+        my $sourceKey = $columnMapping->{$searchColumn}->{from};
+
+        if (ref ($sourceKey) eq 'CODE') {
+          # execute source key code snippet and see what we have
+          my $q = &$sourceKey;
+
+          # check whether code snippet produced a SQL select statement
+          if ($q =~ /\s*SELECT/) {
+            # execute the search lookup query 
+            my $value = $self->lookupQuery ($q, $sourceData);
+
+            # add the search value
+            push @key_args, $value;
+          }
+          else {
+            push @key_args, $q;
+          }
+        }
+        else {
+          # sanity check to ensure we have a valid entry in source record
+          unless (defined $sourceKey && exists $sourceData->{$sourceKey || ''}) {
+            $logger->logdie ("Key column=" . defined $sourceKey ? $sourceKey : '' . "not present in source query");
+          }
+
+          # see if the key column has an associated data type conversion to apply
+          my $conversion = $columnMapping->{$searchColumn}->{conversion};
+
+          if ($conversion && ref ($conversion) eq 'CODE') {
+            # convert data from source to target data type for key column
+            push @key_args, &$conversion($sourceData->{$sourceKey});
+          }
+          else {
+            push @key_args, $sourceData->{$sourceKey};
+          }
+        }
+      }
+    }
+  }
+  else {
+    # no keys provided, fallback to using all update args
+    @key_args = @update_args;
+  }
+
+  # wrapped in UOW already
+  my $uow = $self->{active_uow};
+
+  # default action is insert (for logging purposes only)
+  my $action = 'INSERT';
+
+  eval {
+    $self->begin_work() unless $uow;
+    my $sel_sth = $sths->{select};
+
+    $sel_sth->execute(@key_args);
+
+    my $vals = $sel_sth->fetchrow_arrayref();
+    if (! defined $vals) {
+      my $ins_sth = $sths->{insert};
+      $logger->trace ("Inserting $table [" . Dumper (\@value_args) . "]");
+
+      if ( ! $self->get_option ('dryrun') ) {
+        $ins_sth->execute(@value_args);
+      }
+
+      $self->{inserted}->{$table}++;
+    }
+    else {
+      # check if we need to perform the update
+      my $do_update = 0;
+
+      for (my $c = 0; $c <= $#update_args; $c++) {
+        # compare scalar as strings
+        if ((defined $vals->[$c] ? $vals->[$c] : '') ne 'IGNORE' &&
+            (defined $update_args[$c] ? $update_args[$c] : '') ne (defined $vals->[$c] ? $vals->[$c] : '')) {
+          $logger->trace ("Need to perform update. Field[$c]: " .
+                          (defined $update_args[$c] ? $update_args[$c] : '') . ' <> ' .
+                          (defined $vals->[$c] ? $vals->[$c] : ''));
+          $do_update = 1; 
+          last;
+        }
+      }
+
+      if ($do_update) {
+        $action = 'UPDATE';
+
+        my $upd_sth = $sths->{update};
+        $logger->trace ("Updating $table [" . Dumper (\@update_args) . "]");
+
+        if ( ! $self->get_option ('dryrun') ) {
+          $upd_sth->execute(@update_args, @key_args);
+        }
+
+        $self->{updated}->{$table}++;
+      }
+      else {
+        $logger->trace ("No need to update $table: " . Dumper ($vals) . " = " . Dumper (\@update_args));
+      }
+    }
+    $self->commit() unless $uow;
+  };
+  if ($@) {
+    if ($action eq 'INSERT') {
+      my $rec = {};
+
+      for (my $r = 0 ; $r <= $#value_args; $r++) {
+        $rec->{$sths->{fields}->{insert}->[$r]} = $value_args[$r];
+      }
+
+      $logger->error ("Inserting $table with record: " . Dumper ($rec) . " failed");
+    }
+    else {
+      my $rec = {};
+
+      for (my $r = 0 ; $r <= $#update_args; $r++) {
+        $rec->{$sths->{fields}->{update}->[$r]} = $update_args[$r];
+      }
+
+      $logger->error ("Updating $table with record: " . Dumper ($rec) . " failed");
+    }
+    $self->rollback() unless $uow;
+    $logger->logdie ($@);
+  }
+}
+
+=item C<upsertStatements>
+
+  Default implementation for creating the needed upsert statements (with placeholders)
+  from a $config->targetMapping() in standard SQL syntax. Any of the individual
+  database wrappers may implement their own version, if needed.
+
+  $dbh->upsertStatements ($targetMappings)
+
+  where $targetMappings is DataTransfer::Transfer::Config->targetMapping()
+
+=cut
+sub upsertStatements ($$) {
+  my ($self, $targetMappings) = @_;
+
+  my $logger = $self->get_option('logger');
+
+  my $stmts = {};
+
+  foreach my $targetMapping (@$targetMappings) {
+    my $table = $targetMapping->{table};
+
+    if (! $table) {
+      $logger->logdie ("No table specified in target mapping" . Dumper ($targetMapping));
+    }
+
+    # map primary key/auto generated columns into hash for quick lookup
+    my %autoColumns = map { $_ || '' => 1 } @{$targetMapping->{auto_columns}};
+
+    # map columns that should not be selected and compared to update arguments, eg. date
+    # columns that depend on current ingestion time
+    my %ignoreColumns = map { $_ || '' => 1 } @{$targetMapping->{ignore_columns}};
+  
+    # meta data
+    $stmts->{$table}->{fields} = {}; 
+
+    # insert statement
+    {
+      my $columns = '(';
+      my $values  = 'VALUES (';
+      my $i = 0;
+
+      # store column information, cannot be retrieved from insert statement handle later
+      $stmts->{$table}->{fields}->{insert} = [];
+
+      # always sort on target column
+      foreach my $mapping (sort { $a->{to} cmp $b->{to} } @{$targetMapping->{mapping}}) {
+        my $comma = $i ? ', '   : '';
+
+        if ($mapping->{to}) {
+          $columns .= "$comma$mapping->{to}";
+          $values  .= "$comma?";
+          $i++;
+
+          # store name of insert column
+          push @{$stmts->{$table}->{fields}->{insert}}, $mapping->{to};
+        }
+      }
+      $columns .= ')';
+      $values  .= ')';
+
+      $stmts->{$table}->{insert} = "INSERT INTO $table $columns $values";
+    }
+    # select statement
+    my $where   = '';
+    {
+      my $columns = '';
+      my $i = 0;
+      my $j = 0;
+
+      foreach my $mapping (sort { $a->{to} cmp $b->{to} } @{$targetMapping->{mapping}}) {
+        if (! $mapping->{to}) {
+          next;
+        }
+
+        my $comma = $i ? ', '   : '';
+        my $and   = $j ? ' AND' : '';
+
+        # ensure the columns selected matches the columns to be updated so that we
+        # can prevent unnecessary updates
+        if (! $autoColumns{$mapping->{to}}) {
+          if ($ignoreColumns{$mapping->{to}}) {
+            # ignore columns that change every ingestion time when comparing whether or not
+            # the triggered upsert action is actually needed, add special marker 'IGNORE'
+            $columns .= $comma . "'IGNORE' AS $mapping->{to}";
+          }
+          else {
+            # field is not an auto column and should not be ignore, add it
+            $columns .= "$comma$mapping->{to}";
+          }
+          $i++;
+        }
+
+        if ($targetMapping->{search_columns} && $targetMapping->{search_columns}->[0]) {
+          foreach my $searchColumn (sort @{$targetMapping->{search_columns}}) {
+            # do not add auto columns to search
+            if (! $autoColumns{$searchColumn}) {
+              my $to;
+              # check if search column is a SELECT sub, extract column name
+              if (ref ($searchColumn) eq 'CODE') {
+                my $q = &$searchColumn;
+
+                if ($q =~ /SELECT\s+(\w+)\s+FROM/) {
+                  $to = $1;
+                }
+                else {
+                  $logger->logdie ("No column name to extract from sub query: $q");
+                }
+              }
+              else {
+                $to = $searchColumn;
+              }
+                
+              if ($mapping->{to} eq $to) {
+                $where .= "$and $mapping->{to} = ?";
+                $j++;
+              }
+            }
+          }
+        }
+        else {
+          # use all columns to check for existing record, except auto columns
+          if (! $autoColumns{$mapping->{to}}) {
+            $where .= "$and $mapping->{to} = ?";
+            $j++;
+          }
+        }
+      }
+
+      $stmts->{$table}->{select} = "SELECT $columns FROM $table WHERE $where";
+    } 
+    # update statement
+    {
+      my $set = 'SET ';
+
+      my $i = 0;
+
+      # store column information, cannot be retrieved from update statement handle later
+      $stmts->{$table}->{fields}->{update} = [];
+
+      foreach my $mapping (sort { $a->{to} cmp $b->{to} } @{$targetMapping->{mapping}}) {
+        # ignore key columns, they must stay the same and should not be updated
+        if (! $autoColumns{$mapping->{to}}) {
+          my $comma = $i ? ', ' : '';
+          $set .= "$comma$mapping->{to} = ? ";
+          $i++;
+
+          # store name of update column
+          push @{$stmts->{$table}->{fields}->{update}}, $mapping->{to};
+        }
+      }
+
+      $stmts->{$table}->{update} = "UPDATE $table $set WHERE $where";
+    }
+  }
+  return $stmts;
+}
+
+=item C<lookupQuery>
+
+  Prepares and executes a lookup query that is bound to a DBI hash result set record
+
+  where $query is the parameterized SQL lookup query to execute
+        $source is result set record returned by $sth->fetchrow_hashref()
+=cut
+
+sub lookupQuery ($$) {
+  my ($self, $query, $source) = @_;
+
+  my $logger = $self->get_option('logger');
+
+  my @args = ();
+  # check whether SQL query are bound to some columns in $source
+  while ($query =~ /<\w+>/) {
+    foreach my $columnName (sort keys %$source) {
+      if ($query =~ /<$columnName>/) {
+        $query =~ s/<$columnName>/?/;
+        push @args, $source->{$columnName};
+      }
+    }
+  }
+  $logger->trace ("Executing lookup query: $query " . (scalar @args > 0 ? "with arguments: " . join (",", @args) : ""));
+
+  # prepare cached statement handle and execute lookup query
+  my $qsth = $self->prepare_cached ($query);
+  $qsth->execute (@args);
+
+  my @row = $qsth->fetchrow_array ();
+
+  $qsth->finish();
+
+  if (scalar @row == 0) {
+    $logger->logdie ("Lookup query: $query "  . (scalar @args > 0 ? "executed with arguments: " . join (",", @args) : "") .
+                     " did not return any result");
+  }
+
+  $logger->logdie ("Lookup query: $query did no return exactly one column [@row]") unless scalar @row == 1;
+
+  return $row[0];
+}
+
+=item C<disconnect>
+
+  Disconnect from database
+
+  $dbh->disconnect()
+
+=cut
+sub disconnect() {
+  my $self = shift;
+
+  my $logger = $self->get_option('logger');
+  $logger->info ("Disconnecting from " . $self->describe());
+  $self->SUPER::disconnect();
+}
+
+=back
+
+=cut
+  
+1;
