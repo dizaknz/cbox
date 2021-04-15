@@ -9,9 +9,7 @@ char *data[] = { "alpha", "bravo", "charlie", "delta",
     "victor", "whisky", "x-ray", "yankee", "zulu"
 };
 
-int
-main(void)
-{
+int main(void) {
    ENTRY e, *ep;
    int i;
 
@@ -31,8 +29,6 @@ main(void)
    }
 
    for (i = 22; i < 26; i++) {
-       /* print two entries from the table, and
-          show that two are not in the table */
        e.key = data[i];
        ep = hsearch(e, FIND);
        printf("%9.9s -> %9.9s:%d\n", e.key,

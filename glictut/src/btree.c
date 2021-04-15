@@ -7,9 +7,7 @@
 
 void *root = NULL;
 
-void *
-xmalloc(unsigned n)
-{
+void * xmalloc(unsigned n) {
    void *p;
    p = malloc(n);
    if (p)
@@ -18,9 +16,7 @@ xmalloc(unsigned n)
    exit(EXIT_FAILURE);
 }
 
-int
-compare(const void *pa, const void *pb)
-{
+int compare(const void *pa, const void *pb) {
    if (*(int *) pa < *(int *) pb)
        return -1;
    if (*(int *) pa > *(int *) pb)
@@ -28,9 +24,7 @@ compare(const void *pa, const void *pb)
    return 0;
 }
 
-void
-action(const void *nodep, const VISIT which, const int depth)
-{
+void action(const void *nodep, const VISIT which, const int depth) {
    int *datap;
 
    switch (which) {
@@ -49,9 +43,7 @@ action(const void *nodep, const VISIT which, const int depth)
    }
 }
 
-int
-main(void)
-{
+int main(void) {
    int i, *ptr;
    void *val;
 
