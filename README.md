@@ -1,5 +1,5 @@
 # cbox
 
-Sandbox of collection of C apps written for hacking
+Sandbox of C apps written for hacking.
 
-circa 2000s
+![](https://media.giphy.com/media/Ah3zHH7hvsSB2/giphy.gif)
