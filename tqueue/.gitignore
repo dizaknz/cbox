@@ -4,6 +4,9 @@ conaninfo.txt
 conanbuildinfo.cmake
 graph_info.json
 build
+bin
+*_include.cmake
+*_tests.cmake
 CMakeCache.txt
 CMakeFiles/
 CTestTestfile.cmake
