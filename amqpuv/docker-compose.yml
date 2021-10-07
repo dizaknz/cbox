@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: bitnami/rabbitmq:3.9
+    environment:
+      - RABBITMQ_VHOST=/
+      - RABBITMQ_USERNAME=guest
+      - RABBITMQ_PASSWORD=guest
+      - RABBITMQ_SECURE_PASSWORD=yes
+    network_mode: host
