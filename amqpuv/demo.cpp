@@ -1,42 +1,22 @@
 #include <uv.h>
 #include <amqpcpp.h>
 #include <amqpcpp/libuv.h>
+#include <thread>
+#include <chrono>
+#include <iostream>
 
-class MessageHandler : public AMQP::LibUvHandler
-{
-private:
-    virtual void onError(AMQP::TcpConnection *connection, const char *message) override
-    {
-        std::cout << "error: " << message << std::endl;
-    }
+#include "consumer.hpp"
 
-    virtual void onConnected(AMQP::TcpConnection *connection) override 
-    {
-        std::cout << "connected" << std::endl;
-    }
-    
-public:
-    MessageHandler(uv_loop_t *loop) : AMQP::LibUvHandler(loop) {}
-
-    virtual ~MessageHandler() = default;
-};
 
 int main()
 {
-    auto *loop = uv_default_loop();
-    MessageHandler handler(loop);
-    AMQP::TcpConnection connection(&handler, AMQP::Address("amqp://guest:guest@localhost/"));
-    AMQP::TcpChannel channel(&connection);
-    // create a temporary queue
-    channel.declareQueue(AMQP::exclusive).onSuccess([&connection](const std::string &name, uint32_t messagecount, uint32_t consumercount) {
-        
-        std::cout << "declared queue " << name << std::endl;
-    });
-    
-    // run the loop
-    uv_run(loop, UV_RUN_DEFAULT);
+    Consumer consumer("amqp://guest:guest@localhost/");
+    std::cout << "Running consumer" << std::endl;
+    consumer.Run();
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::cout << "Stopping consumer" << std::endl;
+    consumer.Stop();
 
-    // done
     return 0;
 }
 
