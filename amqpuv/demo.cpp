@@ -7,6 +7,10 @@
 
 #include "consumer.hpp"
 
+// TODO: publisher
+// publisher.Run()
+// publisher.Publish()
+// publisher.Stop();
 
 int main()
 {

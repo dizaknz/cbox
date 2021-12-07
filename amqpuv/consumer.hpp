@@ -6,24 +6,27 @@
 #include <atomic>
 #include <memory>
 
-class MessageHandler : public AMQP::LibUvHandler
+class AMQPHandler : public AMQP::LibUvHandler
 {
     private:
         virtual void onError(AMQP::TcpConnection *connection, const char *message) override
         {
             std::cout << "error: " << message << std::endl;
+            if (!connected)
+            {
+                return;
+            }
             channel->close().onSuccess([&connection, this]() {
                 std::cout << "channel closed" << std::endl;
                 // close the connection
                 connection->close();
             });
         }
-
         virtual void onConnected(AMQP::TcpConnection *connection) override 
         {
             std::cout << "Connected" << std::endl;
+            connected = true;
         }
-
         virtual void onReady(AMQP::TcpConnection *connection) override 
         {
             std::cout << "Connection ready" << std::endl;
@@ -42,7 +45,6 @@ class MessageHandler : public AMQP::LibUvHandler
                 // consume
             });
         }
-
         virtual void onClosed(AMQP::TcpConnection *connection) override 
         {
             std::cout << "Connection closed" << std::endl;
@@ -50,19 +52,23 @@ class MessageHandler : public AMQP::LibUvHandler
 
         // TODO: functions to create channel, queue etc as callbacks
         // support durable vs temporary queues etc
+        void declareTempQueue(std::shared_ptr<AMQP::Channel> channel) {
+
+        }
+        void declareDurableQueue(std::shared_ptr<AMQP::Channel> channel) {}
 
     public:
-        MessageHandler(uv_loop_t *loop) : 
+        AMQPHandler(uv_loop_t *loop) : 
             AMQP::LibUvHandler(loop)
-        {
-        }
+        {}
 
-        virtual ~MessageHandler() = default;
+        virtual ~AMQPHandler() = default;
     private:
         std::shared_ptr<AMQP::TcpChannel> channel;
         std::string exchange;
         std::string key;
         std::string queue;
+        std::atomic<bool> connected = { false };
 };
 
 class Consumer
@@ -71,7 +77,7 @@ class Consumer
         void Run() {
             thread = std::thread([this]() { 
                 loop = uv_default_loop();
-                MessageHandler handler(loop);
+                AMQPHandler handler(loop);
                 connection = std::make_shared<AMQP::TcpConnection> (&handler, AMQP::Address(address));
                 uv_run(loop, UV_RUN_DEFAULT);
             });
@@ -94,3 +100,41 @@ class Consumer
         std::shared_ptr<AMQP::TcpConnection> connection;
         std::string address;
 };
+
+
+// TODO:
+// Extend consumer and add callbacks
+// - set transient or durable queues + properties - just pass in AMQP::Table
+// DurableQueueConsumer
+// TransientQueueConsumer
+
+/*
+
+// callback function that is called when the consume operation starts
+auto startCb = [](const std::string &consumertag) {
+
+    std::cout << "consume operation started" << std::endl;
+};
+
+// callback function that is called when the consume operation failed
+auto errorCb = [](const char *message) {
+
+    std::cout << "consume operation failed" << std::endl;
+};
+
+// callback operation when a message was received
+auto messageCb = [&channel](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
+
+    std::cout << "message received" << std::endl;
+
+    // acknowledge the message
+    channel.ack(deliveryTag);
+};
+
+// start consuming from the queue, and install the callbacks
+channel.consume("my-queue")
+    .onReceived(messageCb)
+    .onSuccess(startCb)
+    .onError(errorCb);
+
+*/
