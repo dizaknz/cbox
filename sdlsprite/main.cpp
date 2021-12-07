@@ -1,13 +1,31 @@
 #include <SDL.h>
 #include <SDL_image.h>
+#include <iomanip>
 
 #include "sprite.hpp"
 
 enum Mode {
     Quiet = 0,
     Listen,
-    Speak
+    Speak,
+    Current,
+    Previous,
+    Next
 };
+
+void intro()
+{
+    std::cout << std::setfill('-') << std::setw(50) << "-\n"
+              << "Sprite animation demo\n\n"
+              << "Keys:\n"
+              << "  q - quiet\n"
+              << "  l - listen\n"
+              << "  s - speak (animate)\n"
+              << "  p - previous (hold to animate backwards)\n"
+              << "  n - next (hold to animate forwards)\n"
+              << "  x - quit\n"
+              << std::endl;
+}
 
 int main(int argc, char ** argv)
 {
@@ -16,11 +34,11 @@ int main(int argc, char ** argv)
     Mode mode = Mode::Quiet;
 
     // hard coded for sample sprite sheet
-    const int width = 194;
+    const int width = 192;
     const int height = 120;
     const int numX = 3;
     const int numY = 6;
-    const int gapX = 0;
+    const int gapX = 3;
     const int gapY = 1;
     const int quietIdx = 0;
     const int listenIdx = 2;
@@ -57,6 +75,8 @@ int main(int argc, char ** argv)
         exit(1);
     }
 
+    intro();
+
     while (!quit)
     {
         while (SDL_PollEvent(&event) != 0)
@@ -64,7 +84,6 @@ int main(int argc, char ** argv)
             switch (event.type)
             {
                 case SDL_KEYDOWN:
-                case SDL_KEYUP:
                 {
                     switch(event.key.keysym.sym)
                     {
@@ -77,6 +96,14 @@ int main(int argc, char ** argv)
                         case SDLK_s:
                             mode = Mode::Speak;
                             break;
+                        case SDLK_p:
+                        case SDLK_LEFT:
+                            mode = Mode::Previous;
+                            break;
+                        case SDLK_n:
+                        case SDLK_RIGHT:
+                            mode = Mode::Next;
+                            break;
                         case SDLK_x:
                             std::cout << "Good bye" << std::endl;
                             quit = true;
@@ -84,6 +111,17 @@ int main(int argc, char ** argv)
                     }
                     break;
                 }
+                case SDL_KEYUP:
+                    switch(event.key.keysym.sym)
+                    {
+                        case SDLK_p:
+                        case SDLK_LEFT:
+                        case SDLK_n:
+                        case SDLK_RIGHT:
+                            mode = Mode::Current;
+                            break;
+                    }
+                    break;
                 case SDL_QUIT:
                     quit = true;
                     break;
@@ -100,6 +138,15 @@ int main(int argc, char ** argv)
                 break;
             case Mode::Speak:
                 sprite.Speak();
+                break;
+            case Mode::Current:
+                sprite.Current();
+                break;
+            case Mode::Previous:
+                sprite.Previous();
+                break;
+            case Mode::Next:
+                sprite.Next();
                 break;
         }
     }

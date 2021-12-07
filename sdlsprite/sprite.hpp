@@ -24,6 +24,7 @@ class SpeakingSprite
         int quietIdx;
         int listenIdx;
         std::atomic<bool> loaded = { false };
+        std::atomic<Uint32> currentIdx = { 0 };
     private:
         int x(Uint32 idx)
         {
@@ -61,6 +62,8 @@ class SpeakingSprite
                 return;
             }
             SDL_RenderPresent(renderer);
+
+            currentIdx = idx;
         }
     public:
         SpeakingSprite(
@@ -139,6 +142,21 @@ class SpeakingSprite
             Uint32 ticks = SDL_GetTicks();
             Uint32 idx = (ticks / 100) % num;
             render(idx);
+        }
+
+        void Current()
+        {
+            render(currentIdx);
+        }
+
+        void Previous()
+        {
+            render(currentIdx == 0 ? num - 1 : currentIdx - 1);
+        }
+
+        void Next()
+        {
+            render(currentIdx == num - 1 ? 0 : currentIdx + 1);
         }
 };
 
