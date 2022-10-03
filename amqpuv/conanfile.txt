@@ -1,6 +1,6 @@
 [requires]
-libuv/1.41.1
-amqp-cpp/4.3.11
+libuv/1.44.1
+amqp-cpp/4.3.16
 
 [generators]
 cmake
