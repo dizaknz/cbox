@@ -41,6 +41,16 @@ class Consumer
                     std::cout << "bound queue " << queue << " to " << routingKey << std::endl;
                     initialised = true;
                 });
+            auto timeoutTime = std::chrono::system_clock::now() + std::chrono::milliseconds(100);
+            while (!initialised)
+            {
+                if (std::chrono::system_clock::now() > timeoutTime)
+                {
+                    // timed out
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+            }
             return initialised;
         }
 
@@ -70,6 +80,16 @@ class Consumer
                 .onSuccess(startCb)
                 .onError(errorCb);
             
+            auto timeoutTime = std::chrono::system_clock::now() + std::chrono::milliseconds(100);
+            while (!consuming)
+            {
+                if (std::chrono::system_clock::now() > timeoutTime)
+                {
+                    // timed out
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+            }
             return consuming;
         }
 
