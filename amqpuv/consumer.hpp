@@ -21,34 +21,41 @@ class Consumer
             Stop();
         }
 
-        void Initialise() 
+        bool Initialise() 
         {
             channel = std::make_unique<AMQP::TcpChannel>(connection.get());
             channel->onError([this](const char *message) {
                 // report error
-                std::cout << "channel error: " << message << std::endl;
-                Stop();
+                std::cerr << "channel error: " << message << std::endl;
             });
-            channel->onReady([this]() {
-                // create a temporary queue
-                channel->declareQueue(AMQP::exclusive).
-                    onSuccess([this](const std::string &name, uint32_t messagecount, uint32_t consumercount) 
-                    {
-                        std::cout << "declared queue " << name << std::endl;
+            // create a temporary queue
+            channel->declareQueue(AMQP::exclusive).
+                onSuccess([this](const std::string &name, uint32_t messagecount, uint32_t consumercount) 
+                {
+                    std::cout << "declared queue " << name << std::endl;
 
-                        queue = name;
-                        channel->bindQueue(exchange, queue, routingKey);
-                    });
-            });
+                    queue = name;
+                });
+            channel->bindQueue(exchange, queue, routingKey).
+                onSuccess([this](){
+                    std::cout << "bound queue " << queue << " to " << routingKey << std::endl;
+                    initialised = true;
+                });
+            return initialised;
         }
 
-        void Start()
+        bool Start()
         {
-            auto startCb = [](const std::string &consumertag) {
+            if (!initialised && !Initialise())
+            {
+                return false;
+            }
+            auto startCb = [this](const std::string &consumertag) {
                 std::cout << "consume operation started" << std::endl;
+                consuming = true;
             };
             auto errorCb = [](const char *message) {
-                std::cout << "consume operation failed" << std::endl;
+                std::cerr << "consume operation failed" << std::endl;
             };
             auto messageCb = [this](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
                 std::cout << "message received" << std::endl;
@@ -57,10 +64,13 @@ class Consumer
                 channel->ack(deliveryTag);
             };
 
-            channel->consume(queue)
+            std::string consumerTag = "consumer_" + queue;
+            channel->consume(queue, consumerTag)
                 .onReceived(messageCb)
                 .onSuccess(startCb)
                 .onError(errorCb);
+            
+            return consuming;
         }
 
         void Stop()

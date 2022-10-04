@@ -3,6 +3,7 @@
 #include <amqpcpp/libuv.h>
 #include <mutex>
 #include <thread>
+#include <chrono>
 #include <atomic>
 #include <memory>
 
@@ -12,12 +13,6 @@ class ConnHandler : public AMQP::LibUvHandler
         virtual void onError(AMQP::TcpConnection *connection, const char *message) override
         {
             std::cout << "error: " << message << std::endl;
-            if (!connected)
-            {
-                return;
-            }
-            // close the connection
-            connection->close();
         }
         virtual void onConnected(AMQP::TcpConnection *connection) override 
         {
@@ -27,7 +22,7 @@ class ConnHandler : public AMQP::LibUvHandler
         virtual void onReady(AMQP::TcpConnection *connection) override 
         {
             std::cout << "Connection ready" << std::endl;
-       }
+        }
         virtual void onClosed(AMQP::TcpConnection *connection) override 
         {
             std::cout << "Connection closed" << std::endl;
@@ -49,16 +44,36 @@ class Messaging
         void Run() {
             thread = std::thread([this]() { 
                 loop = uv_default_loop();
-                ConnHandler handler(loop);
-                connection = std::make_shared<AMQP::TcpConnection> (&handler, AMQP::Address(address));
-
-                
+                handler = std::make_unique<ConnHandler>(loop);
+                connection = std::make_shared<AMQP::TcpConnection> (handler.get(), AMQP::Address(address));
+                channel = std::make_unique<AMQP::TcpChannel>(connection.get());
+                running = true;
                 uv_run(loop, UV_RUN_DEFAULT);
             });
+            auto timeoutTime = std::chrono::system_clock::now() + std::chrono::milliseconds(100);
+            while (!running)
+            {
+                if (std::chrono::system_clock::now() > timeoutTime)
+                {
+                    std::cerr << "Timed out waiting for message loop to start" << std::endl;
+                    // timed out
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+            }
         }
         void Stop() {
-            // TODO: stop consumers
-
+            {
+                // stop consumers
+                std::lock_guard<std::mutex> lock(consumerMutex);
+                for (auto consumer : consumers)
+                {
+                    consumer->Stop();
+                    consumer.reset();
+                }
+                consumers.clear();
+            }
+            channel->close();
             connection->close();
             uv_loop_close(loop);
             running = false;
@@ -67,14 +82,52 @@ class Messaging
                 thread.join();
             }
         }
-        Messaging(std::string address, std::string exchange) 
-        : address(address), exchange(exchange)
+        void CreateExchange(std::string exchange, bool durable = false)
+        {
+            if (!running)
+            {
+                return;
+            }
+            channel->declareExchange(exchange, AMQP::direct, durable ? AMQP::durable : AMQP::autodelete)
+                .onError([](const char *message) {
+                    std::cerr << "failed to create exchange, error: " << message << std::endl;
+                })
+                .onSuccess([exchange]() {
+                    std::cout << "created exchange " << exchange << std::endl;
+                });
+        }
+        void Subscribe(std::string exchange, std::string routingKey)
+        {
+            if (!running)
+            {
+                return;
+            }
+            std::lock_guard<std::mutex> lock(consumerMutex);
+            auto consumer = std::make_shared<Consumer>(connection, exchange, routingKey);
+            if (consumer->Initialise() && consumer->Start())
+            {
+                consumers.push_back(consumer);
+            }
+        }
+        void Publish(std::string exchange, std::string routingKey, std::string message)
+        {
+            if (!running)
+            {
+                return;
+            }
+            channel->publish(exchange, routingKey, message);
+        }
+        Messaging(std::string address) 
+        : address(address)
         {}
     private:
         std::atomic_bool running = {false};
         std::thread thread;
         uv_loop_t *loop;
         std::shared_ptr<AMQP::TcpConnection> connection;
+        std::unique_ptr<AMQP::TcpChannel> channel;
+        std::unique_ptr<ConnHandler> handler;
         std::string address;
-        std::string exchange;
+        std::mutex consumerMutex;
+        std::vector<std::shared_ptr<Consumer>> consumers;
 };
