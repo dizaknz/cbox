@@ -68,7 +68,7 @@ class Consumer
                 std::cerr << "consume operation failed" << std::endl;
             };
             auto messageCb = [this](const AMQP::Message &message, uint64_t deliveryTag, bool redelivered) {
-                std::cout << "message received" << std::endl;
+                std::cout << "message received: " << message.body() << std::endl;
 
                 // TODO: call message handler
                 channel->ack(deliveryTag);
