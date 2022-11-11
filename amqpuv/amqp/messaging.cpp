@@ -7,6 +7,10 @@
 #include <atomic>
 #include <memory>
 
+#include "messaging.h"
+
+#include "consumer.hpp"
+
 class ConnHandler : public AMQP::LibUvHandler
 {
     private:
@@ -38,10 +42,11 @@ class ConnHandler : public AMQP::LibUvHandler
         std::atomic<bool> connected = { false };
 };
 
-class Messaging
+class Messaging::Impl
 {
     public:
-        void Run() {
+        void Run()
+        {
             thread = std::thread([this]() { 
                 loop = uv_default_loop();
                 handler = std::make_unique<ConnHandler>(loop);
@@ -62,7 +67,8 @@ class Messaging
                 std::this_thread::sleep_for(std::chrono::nanoseconds(100));
             }
         }
-        void Stop() {
+        void Stop()
+        {
             {
                 // stop consumers
                 std::lock_guard<std::mutex> lock(consumerMutex);
@@ -117,9 +123,10 @@ class Messaging
             }
             channel->publish(exchange, routingKey, message);
         }
-        Messaging(std::string address) 
+        Impl(std::string address) 
         : address(address)
         {}
+        ~Impl();
     private:
         std::atomic_bool running = {false};
         std::thread thread;
@@ -131,3 +138,38 @@ class Messaging
         std::mutex consumerMutex;
         std::vector<std::shared_ptr<Consumer>> consumers;
 };
+
+Messaging::Impl::~Impl() {}
+
+Messaging::Messaging(std::string address)
+{
+    impl = std::make_unique<Messaging::Impl>(address);
+}
+
+Messaging::~Messaging() {}
+
+void Messaging::Run()
+{
+    impl->Run();
+}
+
+void Messaging::Stop()
+{
+    impl->Stop();
+}
+
+void Messaging::CreateExchange(std::string exchange, bool durable)
+{
+    impl->CreateExchange(exchange, durable);
+}
+
+void Messaging::Subscribe(std::string exchange, std::string routingKey)
+{
+    impl->Subscribe(exchange, routingKey);
+}
+
+void Messaging::Publish(std::string exchange, std::string routingKey, std::string message)
+{
+    impl->Publish(exchange, routingKey, message);
+}
+ 

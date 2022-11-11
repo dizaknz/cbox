@@ -30,8 +30,7 @@ enable_testing()
 
 add_library(amqp
     SHARED
-    messaging.hpp
-    consumer.hpp)
+    messaging.cpp)
 
 set_target_properties(amqp PROPERTIES LINKER_LANGUAGE CXX)
 
