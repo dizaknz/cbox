@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(amqpuv)
+project(amqp)
 
 if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
   message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
@@ -26,16 +26,13 @@ set(CMAKE_CXX_STANDARD 14)
 include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
-include_directories(BEFORE
-  ${CONAN_INCLUDE_DIRS_AMQP})
-
 enable_testing()
 
-add_executable(
-  amqpuv_demo
-  demo.cpp
-)
-target_link_libraries(
-  amqpuv_demo
-  ${CONAN_LIBS}
-)
+add_library(amqp
+    SHARED
+    messaging.cpp)
+
+set_target_properties(amqp PROPERTIES LINKER_LANGUAGE CXX)
+
+target_link_libraries(amqp
+    ${CONAN_LIBS})
