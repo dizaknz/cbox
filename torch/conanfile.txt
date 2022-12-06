@@ -1,0 +1,6 @@
+[requires]
+cli11/2.1.1
+spdlog/1.11.0
+
+[generators]
+cmake
