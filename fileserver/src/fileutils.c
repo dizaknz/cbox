@@ -195,6 +195,9 @@ int FileUtils_calcFileMD5 (const char *filename, md5digest *md5sum) {
         return ERROR;
     }
 
+    // TODO
+    // EVP_Q_digest(NULL, "MD5", NULL, target.c_str(), target.size(), digest, NULL);
+
     MD5_Init (&context);
 
     while ((bytes = fread (data, 1, BLOCK_SIZE, file)) != 0) {
