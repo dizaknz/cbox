@@ -29,6 +29,17 @@ conan_basic_setup()
 
 find_package(Torch REQUIRED)
 
+add_library(tlib SHARED
+    dcgan.hpp
+    net.hpp
+    loader.hpp
+)
+set_target_properties(tlib PROPERTIES LINKER_LANGUAGE CXX)
+target_link_libraries(tlib
+    "${TORCH_LIBRARIES}"
+    spdlog 
+    fmt
+)
 add_executable(torchdemo train.cpp)
 target_link_libraries(torchdemo
     "${TORCH_LIBRARIES}"
