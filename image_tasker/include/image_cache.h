@@ -66,7 +66,7 @@ public:
     ImageCache(const ImageCache&) = delete;
     ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue);
     void resize_by(int delta_size_bytes);
-    const ImageData& get(const std::string& image_file_name, int width, int height, bool& found_entry);
+    const ImageData& get(int key, bool& found_entry);
 
 private:
     /**

@@ -5,35 +5,53 @@
 #include <memory>
 #include <functional>
 
+constexpr int UNSET_WIDTH = -1;
+constexpr int UNSET_HEIGHT = -1;
+constexpr int UNSET_CHANNELS = -1;
+
 /**
  * @brief Define the properties of an image
  */
 struct ImageData
 {
     std::string source_file_path;
-    int width;
-    int height;
-    int channels;
-    int size_bytes;
+    int width = UNSET_WIDTH;
+    int height = UNSET_HEIGHT;
+    int channels = UNSET_CHANNELS;
+    bool is_original_size = true;
+    int size_bytes = 0;
     std::unique_ptr<unsigned char[]> raw_data;
 
     int key()
     {
         std::size_t name_hash = std::hash<std::string>{}(source_file_path);
-        std::size_t size_hash = std::hash<long>{}(width*height);
+        if (!is_original_size && width != UNSET_WIDTH && height != UNSET_HEIGHT)
+        {
+            size_t size_hash = std::hash<long>{}(width*height);
 
-        return name_hash ^ (size_hash + 0x9e3779b9 + (name_hash << 6) + (name_hash >> 2));
+            return name_hash ^ (size_hash + 0x9e3779b9 + (name_hash << 6) + (name_hash >> 2));
+        }
+
+        // default to only name hash for original image size
+        return name_hash;
     }
 
     ImageData() = default;
-    ImageData(const std::string source_file_path, int width, int height)
-    : source_file_path(source_file_path), width(width), height(height)
+    ImageData(const std::string source_file_path, int width, int height, bool is_original_size)
+    : source_file_path(source_file_path),
+      width(width),
+      height(height),
+      is_original_size(is_original_size)
     {}
 };
 
-static int get_image_key(const std::string source_file_path, int width, int height)
+static int get_image_key(
+    const std::string source_file_path,
+    int width = UNSET_WIDTH,
+    int height = UNSET_HEIGHT,
+    bool is_original_size = true)
 {
-    return ImageData(source_file_path, width, height).key();
+    return ImageData(source_file_path, width, height, is_original_size).key();
 }
 
 class IImageDataReader

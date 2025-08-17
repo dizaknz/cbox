@@ -27,10 +27,9 @@ void ImageCache::resize_by(int delta_size_bytes)
     cache_size_bytes += delta_size_bytes;
 }
 
-const ImageData& ImageCache::get(const std::string& image_file_name, int width, int height, bool& found_entry)
+const ImageData& ImageCache::get(int key, bool& found_entry)
 {
     found_entry = false;
-    int key = get_image_key(image_file_name, width, height);
     if (transient_dirty_locks.count(key))
     {
         while(transient_dirty_locks.count(key) && transient_dirty_locks[key] == DirtyFlag{true});

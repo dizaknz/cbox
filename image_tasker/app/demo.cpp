@@ -90,6 +90,7 @@ private:
                 auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(task_status->duration);
                 info("Task Status - task: " + task_status->task_id
                      + " state: " + task_state_to_string(task_status->state)
+                     + (task_status->state == TaskState::Failed ? " error: " + task_status->errors[0] : "")
                      + " time elapsed: " + std::to_string(elapsed_time.count()) + "ms");
             }
         }
@@ -119,7 +120,7 @@ int main(int argc, char **argv)
     int request_timeout_ms = 25;
     int width = 612;
     int height = 407;
-    std::string image_file_path = std::string(std::filesystem::current_path().string() + "\\..\\..\\tests\\data\\test-image-1.jpg");
+    std::string image_file_path = std::string(std::filesystem::current_path().string() + "\\..\\tests\\data\\test-image-1.jpg");
     app.add_option("-i", image_file_path, "Full path to a on-disk image to test");
     app.add_option("-x", width, "Width of image to test");
     app.add_option("-y", height, "Height of image to test");
@@ -144,9 +145,7 @@ int main(int argc, char **argv)
     info("Loading image: " + image_file_path);
     for (int i = 0; i < 10; i++)
     {
-        // due to limitation of key caching the raw image size needs to be known before hand
-        // for raw load, this is not possible
-        image_manager->async_request_image_load(image_file_path, width, height, image_handler);
+        image_manager->async_request_image_load(image_file_path, image_handler);
     }
     info("Resizing image: " + image_file_path);
     width /= 2;

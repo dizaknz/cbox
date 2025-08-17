@@ -31,8 +31,6 @@ public:
      */
     void async_request_image_load(
         const std::string& image_path,
-        int size_x,
-        int size_y,
         std::shared_ptr<IImageHandler> handler);
 
     /**

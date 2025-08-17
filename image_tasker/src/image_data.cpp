@@ -32,6 +32,7 @@ std::unique_ptr<ImageData> ImageDiskReader::read_image_data(std::vector<std::str
         read_errors.push_back(stbi_failure_reason());
         return data;
     }
+    data->is_original_size = true;
     data->size_bytes = data->width * data->height * data->channels;
     // own the raw memory of image
     data->raw_data = std::unique_ptr<unsigned char[]>(raw_data);
@@ -100,6 +101,7 @@ std::unique_ptr<ImageData> ImageDataResizer::resize_image_data(const ImageData& 
         resize_errors.push_back(stbi_failure_reason());
         return resized_data;
     }
+    resized_data->is_original_size = false;
     resized_data->source_file_path = in_image_data.source_file_path;
     resized_data->width = resize_width;
     resized_data->height = resize_height;
