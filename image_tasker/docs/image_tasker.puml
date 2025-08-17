@@ -1,0 +1,203 @@
+@startuml
+
+
+
+
+
+/' Objects '/
+
+abstract class IImageDataReader {
+	+{abstract} read_image_data(std::vector<std::string>& read_errors) : std::unique_ptr<ImageData>
+}
+
+
+abstract class IImageHandler {
+	+{abstract} Process(const ImageData &) : void
+}
+
+
+class ImageCache {
+	+ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue)
+	+get(const std::string& image_file_name, int width, int height, bool& found_entry) : ImageData&
+	-cache_thread : std::jthread
+	-used_count : std::map<int, AtomicWrapper<int>>
+	-write_mutex : std::mutex
+	-not_found : std::unique_ptr<ImageData>
+	-transient_dirty_locks : std::unordered_map<int, DirtyFlag>
+	-cache_entries : std::unordered_map<int, std::unique_ptr<ImageData>>
+	-cache_size_bytes : unsigned int
+	-running_size_bytes : unsigned int
+	-bust_least_used_cache(int required_free_bytes) : void
+	+resize_by(int delta_size_bytes) : void
+	-run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageData>> result_queue) : void
+}
+
+
+class ImageDataResizer {
+	+ImageDataResizer(int resize_width, int resize_height)
+	-resize_height : int
+	-resize_width : int
+	+resize_image_data(const ImageData& in_image_data, std::vector<std::string> resize_errors) : std::unique_ptr<ImageData>
+}
+
+
+class ImageDataTransferer {
+	+ImageDataTransferer(std::unique_ptr<ImageData> data)
+	-data : std::unique_ptr<ImageData>
+	+read_image_data(std::vector<std::string>& read_errors) : std::unique_ptr<ImageData>
+}
+
+
+class ImageDiskReader {
+	+ImageDiskReader(const std::string& source_file_path)
+	-source_file_path : std::string
+	+read_image_data(std::vector<std::string>& read_errors) : std::unique_ptr<ImageData>
+}
+
+
+class ImageManager {
+	+ImageManager(int image_cache_size_mb, int task_pool_size, int request_timeout_ms)
+	+~ImageManager()
+	-impl : std::shared_ptr<Impl>
+	+async_request_image_load(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler) : void
+	+async_request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler) : void
+	+register_task_status_queue(std::shared_ptr<TQueue<TaskStatus>> queue) : void
+}
+
+
+class ImageTaskManager {
+	+ImageTaskManager()
+	+ImageTaskManager(unsigned int pool_size)
+	+~ImageTaskManager()
+	-pool_mutex : std::mutex
+	-task_queue : std::shared_ptr<TQueue<ImageTask>>
+	-runner_pool : std::vector<std::unique_ptr<ImageTaskRunner>>
+	-pool_size : unsigned int
+	+increase_pool_size_by(unsigned int delta_pool_size) : void
+	+submit_task(ImageTask* const task) : void
+}
+
+
+class ImageTaskRunner {
+	+ImageTaskRunner(std::shared_ptr<TQueue<ImageTask>> task_queue)
+	+~ImageTaskRunner()
+	-task_running : std::atomic_flag
+	-runner_thread : std::jthread
+	-report_task_failure(const ImageTask& task, std::chrono::duration<double> duration, std::vector<std::string> errors) : void
+	-report_task_success(const ImageTask& task, std::chrono::duration<double> duration) : void
+	-run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask>> task_queue) : void
+	-stop() : void
+}
+
+
+enum TaskState {
+	Completed
+	Failed
+	NotRunning
+	Running
+	Starting
+}
+
+
+class AtomicWrapper <template<class T>> {
+	+AtomicWrapper()
+	+AtomicWrapper(const std::atomic<T>& in_value)
+	+AtomicWrapper(const AtomicWrapper& other)
+	+operator=(const AtomicWrapper& other) : AtomicWrapper&
+	+load() : T {query}
+	+operator==(const AtomicWrapper& other) : bool {query}
+	+atomic_value : std::atomic<T>
+	+store(T val) : void
+}
+
+
+class ImageData {
+	+ImageData()
+	+ImageData(const std::string source_file_path, int width, int height)
+	+channels : int
+	+height : int
+	+key() : int
+	+size_bytes : int
+	+width : int
+	+source_file_path : std::string
+	+raw_data : std::unique_ptr<unsigned char [ ]>
+}
+
+
+class ImageTask {
+	+auto_resize : bool
+	+desired_height : int
+	+desired_width : int
+	+result_queue : std::shared_ptr<TQueue<ImageData>>
+	+status_queue : std::shared_ptr<TQueue<TaskStatus>>
+	+task_id : std::string
+	+reader : std::unique_ptr<IImageDataReader>
+	+resizer : std::unique_ptr<ImageDataResizer>
+}
+
+
+class TaskStatus {
+	+TaskStatus(const std::string& task_id, const TaskState state, std::chrono::duration<double> duration, const std::vector<std::string>& errors)
+	+TaskStatus(const std::string& task_id, const TaskState state, std::chrono::duration<double> duration)
+	+state : TaskState
+	+duration : std::chrono::duration<double>
+	+task_id : std::string
+	+errors : std::vector<std::string>
+}
+
+
+
+
+
+/' Inheritance relationships '/
+
+IImageDataReader <|-- ImageDataTransferer
+
+
+IImageDataReader <|-- ImageDiskReader
+
+
+
+
+
+/' Aggregation relationships '/
+
+ImageCache *-- AtomicWrapper
+
+
+ImageCache "2" o-- ImageData
+
+
+ImageDataTransferer o-- ImageData
+
+
+ImageTask o-- IImageDataReader
+
+
+ImageTask *-- ImageData
+
+
+ImageTask o-- ImageDataResizer
+
+
+ImageTask *-- TaskStatus
+
+
+ImageTaskManager *-- ImageTask
+
+
+ImageTaskManager o-- ImageTaskRunner
+
+
+TaskStatus *-- TaskState
+
+
+
+
+
+
+/' Nested objects '/
+
+
+
+@enduml

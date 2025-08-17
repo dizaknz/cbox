@@ -15,16 +15,3 @@ Sandbox of C/C++ demo apps.
 
 * [recsearch](./recsearch/README.md): An incomplete record search
 * [torch](./torch/): A preliminary demo of libtorch
-
-## utils
-
-* [funccpp](./funccpp)
-* [ncread](./ncread)
-* [tdelta](./tdelta)
-* [tilecache](./tilecache)
-* [tqueue](./tqueue)
-
-
-
-
-
