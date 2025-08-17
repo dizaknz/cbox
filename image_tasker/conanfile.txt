@@ -1,0 +1,12 @@
+[requires]
+stb/cci.20240531
+cli11/2.5.0
+spdlog/1.15.3
+gtest/1.16.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout
