@@ -83,7 +83,7 @@ TEST(ImageManager, Load)
     image_manager->register_task_status_queue(status_queue);
     for (int i = 0; i < 10; i++)
     {
-        image_manager->async_request_image_load(file, 612, 407, image_handler);
+        image_manager->async_request_image_load(file, image_handler);
     }
      
     std::this_thread::sleep_for(std::chrono::milliseconds(250)); 

@@ -20,23 +20,23 @@ public:
         image_queue->stop();
     }
 
-    void async_request_image_load(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler)
+    void async_request_image_load(const std::string& image_path, std::shared_ptr<IImageHandler> handler)
     {
         std::weak_ptr<Impl> weak_impl = shared_from_this();
         // take a copy of weak impl and handler
-        std::future done = std::async(std::launch::async, [weak_impl, image_path, size_x, size_y, handler]() {
+        std::future done = std::async(std::launch::async, [weak_impl, image_path, handler]() {
             if (auto impl = weak_impl.lock())
             {
                 // query cache
                 bool found_entry = false;
-                const ImageData &image_data = impl->image_cache->get(image_path, size_x, size_y, found_entry);
+                int key = get_image_key(image_path);
+                const ImageData &image_data = impl->image_cache->get(key, found_entry);
                 if (found_entry)
                 {
                     handler->Process(image_data);
                     return;
                 }
                 
-                int key = get_image_key(image_path, size_x, size_y);
                 // if not in cache, submit request to load
                 ImageTask *task = new ImageTask();
                 task->task_id = "image loader: " + std::to_string(key);
@@ -52,7 +52,7 @@ public:
                 found_entry = false;
                 while(!found_entry)
                 {
-                    auto& check = impl->image_cache->get(image_path, size_x, size_y, found_entry);
+                    auto& check = impl->image_cache->get(key, found_entry);
                     if (wait_ms > impl->request_timeout_ms)
                     {
                         return;
@@ -60,7 +60,7 @@ public:
                     std::this_thread::sleep_for(std::chrono::milliseconds(1)); 
                     wait_ms++;
                 }
-                handler->Process(impl->image_cache->get(image_path, size_x, size_y, found_entry));
+                handler->Process(impl->image_cache->get(key, found_entry));
             }
         });
     }
@@ -73,13 +73,14 @@ public:
             {
                 // query cache for resized image, if not in cache submit request to resize
                 bool found_entry = false;
-                const ImageData &image_data = impl->image_cache->get(image_path, size_x, size_y, found_entry);
+                bool is_original_size = false;
+                int key = get_image_key(image_path, size_x, size_y, is_original_size);
+                const ImageData &image_data = impl->image_cache->get(key, found_entry);
                 if (found_entry)
                 {
                     handler->Process(image_data);
                     return;
                 }
-                int key = get_image_key(image_path, size_x, size_y);
                 ImageTask *task = new ImageTask();
                 task->task_id = "image resizer: " + std::to_string(key);
                 task->auto_resize = true;
@@ -95,7 +96,7 @@ public:
                 found_entry = false;
                 while(!found_entry)
                 {
-                    auto& check = impl->image_cache->get(image_path, size_x, size_y, found_entry);
+                    auto& check = impl->image_cache->get(key, found_entry);
                     if (wait_ms > impl->request_timeout_ms)
                     {
                         return;
@@ -103,7 +104,7 @@ public:
                     std::this_thread::sleep_for(std::chrono::milliseconds(1)); 
                     wait_ms++;
                 }
-                handler->Process(impl->image_cache->get(image_path, size_x, size_y, found_entry));
+                handler->Process(impl->image_cache->get(key, found_entry));
             }
         });
     }
@@ -128,11 +129,9 @@ ImageManager::ImageManager(int image_cache_size_mb, int task_pool_size, int requ
 
 void ImageManager::async_request_image_load(
     const std::string& image_path,
-    int size_x,
-    int size_y,
     std::shared_ptr<IImageHandler> handler)
 {
-    impl->async_request_image_load(image_path, size_x, size_y, handler);
+    impl->async_request_image_load(image_path, handler);
 }
 
 void ImageManager::async_request_image_resize(
