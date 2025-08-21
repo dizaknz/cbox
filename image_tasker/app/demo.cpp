@@ -117,7 +117,7 @@ int main(int argc, char **argv)
     // defaults for testing in debugger
     int image_cache_size_mb = 16;
     int task_pool_size = 4;
-    int request_timeout_ms = 25;
+    int request_timeout_ms = 250;
     int width = 612;
     int height = 407;
     std::string image_file_path = std::string(std::filesystem::current_path().string() + "\\..\\tests\\data\\test-image-1.jpg");
@@ -143,16 +143,16 @@ int main(int argc, char **argv)
 
     image_manager->register_task_status_queue(status_queue);
     info("Loading image: " + image_file_path);
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 100; i++)
     {
-        image_manager->async_request_image_load(image_file_path, image_handler);
+        image_manager->request_image_load(image_file_path, image_handler);
     }
     info("Resizing image: " + image_file_path);
     width /= 2;
     height /= 2;
     for (int i = 0; i < 100; i++)
     {
-        image_manager->async_request_image_resize(image_file_path, width, height, image_handler);
+        image_manager->request_image_resize(image_file_path, width, height, image_handler);
         if (i % 25 == 0)
         {
             width /= 2;

@@ -115,7 +115,14 @@ ImageTaskManager::ImageTaskManager() : ImageTaskManager(DEFAULT_POOL_SIZE)
 ImageTaskManager::ImageTaskManager(unsigned int pool_size)
 {
     task_queue = std::make_shared<TQueue<ImageTask>>();
-    this->pool_size = std::max(pool_size, std::thread::hardware_concurrency());
+    if (pool_size < 1)
+    {
+        this->pool_size = DEFAULT_POOL_SIZE;
+    }
+    else
+    {
+        this->pool_size = std::min(pool_size, std::thread::hardware_concurrency());
+    }
     while (runner_pool.size() != this->pool_size)
     {
         runner_pool.emplace_back(std::make_unique<ImageTaskRunner>(task_queue));

@@ -49,6 +49,7 @@ struct AtomicWrapper
 
 using DirtyFlag = AtomicWrapper<bool>;
 
+constexpr unsigned int MIN_CACHE_SIZE_BYTES = 1 << 20;
 constexpr unsigned int MAX_CACHE_SIZE_BYTES = 1024 << 20;
 
 /**

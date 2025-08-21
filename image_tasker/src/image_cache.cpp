@@ -7,7 +7,14 @@
 
 ImageCache::ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue)
 {
-    this->cache_size_bytes = std::max(cache_size_bytes, MAX_CACHE_SIZE_BYTES);
+    if (cache_size_bytes < MIN_CACHE_SIZE_BYTES)
+    {
+        this->cache_size_bytes = MIN_CACHE_SIZE_BYTES;
+    }
+    else
+    {
+        this->cache_size_bytes = std::min(cache_size_bytes, MAX_CACHE_SIZE_BYTES);
+    }
     cache_thread = std::jthread{
         [image_queue, this](std::stop_token ctrl){
             run(ctrl, image_queue);
