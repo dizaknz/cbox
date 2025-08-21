@@ -51,13 +51,13 @@ conan profile detect --force
 Install project depedencies
 
 ```
+mkdir build
 conan install . --output-folder=build --build=missing
 ```
 
 Setup cmake
 
 ```
-mkdir build
 cmake -B build -S . -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=./build/conan_provider.cmake
 ```
 

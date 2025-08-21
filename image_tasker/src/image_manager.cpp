@@ -20,11 +20,11 @@ public:
         image_queue->stop();
     }
 
-    void async_request_image_load(const std::string& image_path, std::shared_ptr<IImageHandler> handler)
+    void request_image_load(const std::string& image_path, std::shared_ptr<IImageHandler> handler)
     {
         std::weak_ptr<Impl> weak_impl = shared_from_this();
-        // take a copy of weak impl and handler
-        std::future done = std::async(std::launch::async, [weak_impl, image_path, handler]() {
+        // run on same thread
+        std::future done = std::async(std::launch::deferred, [weak_impl, image_path, handler]() {
             if (auto impl = weak_impl.lock())
             {
                 // query cache
@@ -63,12 +63,14 @@ public:
                 handler->Process(impl->image_cache->get(key, found_entry));
             }
         });
+        done.wait();
     }
 
-    void async_request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler)
+    void request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler)
     {
         std::weak_ptr<Impl> weak_impl = shared_from_this();
-        std::future done = std::async(std::launch::async, [weak_impl, image_path, size_x, size_y, handler]() {
+        // run on same thread
+        std::future done = std::async(std::launch::deferred, [weak_impl, image_path, size_x, size_y, handler]() {
             if (auto impl = weak_impl.lock())
             {
                 // query cache for resized image, if not in cache submit request to resize
@@ -107,6 +109,7 @@ public:
                 handler->Process(impl->image_cache->get(key, found_entry));
             }
         });
+        done.wait();
     }
 
     void register_task_status_queue(std::shared_ptr<TQueue<TaskStatus>> queue)
@@ -127,20 +130,20 @@ ImageManager::ImageManager(int image_cache_size_mb, int task_pool_size, int requ
     impl = std::make_shared<Impl>(image_cache_size_mb, task_pool_size, request_timeout_ms);
 }
 
-void ImageManager::async_request_image_load(
+void ImageManager::request_image_load(
     const std::string& image_path,
     std::shared_ptr<IImageHandler> handler)
 {
-    impl->async_request_image_load(image_path, handler);
+    impl->request_image_load(image_path, handler);
 }
 
-void ImageManager::async_request_image_resize(
+void ImageManager::request_image_resize(
     const std::string& image_path,
     int size_x,
     int size_y,
     std::shared_ptr<IImageHandler> handler)
 {
-    impl->async_request_image_resize(image_path, size_x, size_y, handler);
+    impl->request_image_resize(image_path, size_x, size_y, handler);
 }
 
 void ImageManager::register_task_status_queue(std::shared_ptr<TQueue<TaskStatus>> queue)

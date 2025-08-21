@@ -29,14 +29,14 @@ public:
     /**
      * @brief Request loading an image from disk or memory for the image handler provided.
      */
-    void async_request_image_load(
+    void request_image_load(
         const std::string& image_path,
         std::shared_ptr<IImageHandler> handler);
 
     /**
      * @brief Request resizing an image to be processed by the provided image handler.
      */
-    void async_request_image_resize(
+    void request_image_resize(
         const std::string& image_path,
         int size_x,
         int size_y,
