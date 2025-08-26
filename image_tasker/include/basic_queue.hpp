@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <optional>
 #include <thread>
+#include <stop_token>
 
 /**
  * @brief Basic threadsafe queue

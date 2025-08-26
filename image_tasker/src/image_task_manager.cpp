@@ -1,5 +1,5 @@
 #include "image_task_manager.h"
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_data.h"
 #include "task_status.h"
 
@@ -24,6 +24,7 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
     while (!ctrl.stop_requested())
     {
         while(task_running.test_and_set(std::memory_order_acquire));
+        task_queue->wait_for_entry_or_shutdown();
         std::optional<ImageTask> task = task_queue->dequeue();
         if (task.has_value())
         {

@@ -1,6 +1,6 @@
 #include "image_cache.h"
 
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_data.h"
 
 #include <algorithm>
@@ -55,6 +55,7 @@ void ImageCache::run(std::stop_token ctrl, std::shared_ptr<TQueue<std::unique_pt
     // atomic dirty flag per entry - transient
     while (!ctrl.stop_requested())
     {
+        result_queue->wait_for_entry_or_shutdown();
         std::optional<std::unique_ptr<ImageData>> image_data = result_queue->dequeue();
         if (image_data.has_value())
         {

@@ -1,5 +1,5 @@
 #include "image_manager.h"
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_data.h"
 #include "image_cache.h"
 #include "image_task_manager.h"

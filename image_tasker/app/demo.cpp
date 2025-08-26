@@ -11,7 +11,7 @@
 
 #include "image_data.h"
 #include "task_status.h"
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_task_manager.h"
 
 using namespace spdlog;
@@ -47,6 +47,7 @@ private:
         }
         while (!ctrl.stop_requested())
         {
+            metrics_queue->wait_for_entry_or_shutdown();
             std::optional<CacheMetrics> cache_metrics = metrics_queue->dequeue();
             if (cache_metrics.has_value())
             {
@@ -84,6 +85,7 @@ private:
         }
         while (!ctrl.stop_requested())
         {
+            status_queue->wait_for_entry_or_shutdown();
             std::optional<TaskStatus> task_status = status_queue->dequeue();
             if (task_status.has_value())
             {
