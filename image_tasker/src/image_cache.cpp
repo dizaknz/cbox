@@ -4,8 +4,9 @@
 #include "image_data.h"
 
 #include <algorithm>
+#include <optional>
 
-ImageCache::ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue)
+ImageCache::ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> image_queue)
 {
     if (cache_size_bytes < MIN_CACHE_SIZE_BYTES)
     {
@@ -49,25 +50,25 @@ const ImageData& ImageCache::get(int key, bool& found_entry)
     return *cache_entries[key].get();
 }
 
-void ImageCache::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageData>> result_queue)
+void ImageCache::run(std::stop_token ctrl, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue)
 {
     // atomic dirty flag per entry - transient
     while (!ctrl.stop_requested())
     {
-        std::unique_ptr<ImageData> image_data = result_queue->dequeue();
-        if (image_data)
+        std::optional<std::unique_ptr<ImageData>> image_data = result_queue->dequeue();
+        if (image_data.has_value())
         {
-            int key = image_data->key();
+            int key = image_data.value()->key();
             transient_dirty_locks.emplace(key, DirtyFlag{std::atomic<bool>{true}});
             std::lock_guard<std::mutex> lock(write_mutex);
-            if (running_size_bytes + image_data->size_bytes > cache_size_bytes)
+            if (running_size_bytes + image_data.value()->size_bytes > cache_size_bytes)
             {
-                bust_least_used_cache(image_data->size_bytes);
+                bust_least_used_cache(image_data.value()->size_bytes);
             }
-            running_size_bytes += image_data->size_bytes;
+            running_size_bytes += image_data.value()->size_bytes;
             used_count.insert(std::pair<int, AtomicWrapper<int>>(key, AtomicWrapper<int>{std::atomic<int>{0}}));
             // transfer ownership once done accessing image_data
-            cache_entries.insert(std::pair<int, std::unique_ptr<ImageData>>(key, std::move(image_data)));
+            cache_entries.insert(std::pair<int, std::unique_ptr<ImageData>>(key, std::move(*image_data)));
             transient_dirty_locks.erase(key);
         }
     }

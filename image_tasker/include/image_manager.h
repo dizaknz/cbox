@@ -10,7 +10,7 @@ struct TaskStatus;
 class IImageHandler
 {
 public:
-    virtual void Process(const ImageData&) = 0;
+    virtual void Process(const ImageData&) const = 0;
 };
 
 /**

@@ -34,8 +34,8 @@ private:
         }
         while (!ctrl.stop_requested())
         {
-            std::unique_ptr<TaskStatus> task_status = status_queue->dequeue();
-            if (task_status)
+            std::optional<TaskStatus> task_status = status_queue->dequeue();
+            if (task_status.has_value())
             {
                 auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(task_status->duration);
                 std::cout << "[Task Status - " 
@@ -58,47 +58,45 @@ TEST(ImageTask, Load)
 {
     std::unique_ptr<ImageTaskManager> task_manager = std::make_unique<ImageTaskManager>();
     std::shared_ptr<TQueue<TaskStatus>> status_queue = std::make_shared<TQueue<TaskStatus>>();
-    std::shared_ptr<TQueue<ImageData>> image_queue = std::make_shared<TQueue<ImageData>>();
+    std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> image_queue = std::make_shared<TQueue<std::unique_ptr<ImageData>>>();
     TaskStatusReporter task_status_reporter(status_queue);
 
     for (int i = 0; i < 10; i++)
     {
-        ImageTask *task = new ImageTask();
-        task->task_id = "image loader: " + std::to_string(i+1);
-        task->auto_resize = false;
-        task->status_queue = status_queue;
-        task->result_queue = image_queue;
- 
+        std::string task_id = "image loader: " + std::to_string(i+1);
         std::string file = std::string(std::filesystem::current_path().string() + "\\..\\tests\\data\\test-image-1.jpg");
-        task->reader = std::make_unique<ImageDiskReader>(file);
-        task_manager->submit_task(task);
+        task_manager->submit_task(ImageTask(
+            task_id,
+            file,
+            status_queue,
+            image_queue
+        ));
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(50 * 20)); 
-    status_queue->stop();
+    status_queue->shutdown();
 }
 
 TEST(ImageTask, Resize)
 {
     std::unique_ptr<ImageTaskManager> task_manager = std::make_unique<ImageTaskManager>();
     std::shared_ptr<TQueue<TaskStatus>> status_queue = std::make_shared<TQueue<TaskStatus>>();
-    std::shared_ptr<TQueue<ImageData>> image_queue = std::make_shared<TQueue<ImageData>>();
+    std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> image_queue = std::make_shared<TQueue<std::unique_ptr<ImageData>>>();
     TaskStatusReporter task_status_reporter(status_queue);
 
     for (int i = 0; i < 10; i++)
     {
-        ImageTask *task = new ImageTask();
-        task->task_id = "image resizer: " + std::to_string(i+1);
-        task->auto_resize = true;
-        task->status_queue = status_queue;
-        task->result_queue = image_queue;
- 
         std::string file = std::string(std::filesystem::current_path().string() + "\\..\\tests\\data\\test-image-1.jpg");
-        task->reader = std::make_unique<ImageDiskReader>(file);
-        task->resizer = std::make_unique<ImageDataResizer>(64, 64);
-        task_manager->submit_task(task);
+        task_manager->submit_task(ImageTask(
+            "image resizer: " + std::to_string(i+1),
+            file,
+            64, 
+            64,
+            status_queue,
+            image_queue
+        ));
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(50 * 20)); 
-    status_queue->stop();
+    status_queue->shutdown();
 }

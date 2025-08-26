@@ -37,12 +37,24 @@ struct ImageData
     }
 
     ImageData() = default;
+    ImageData(const ImageData&) = delete;
     ImageData(const std::string source_file_path, int width, int height, bool is_original_size)
     : source_file_path(source_file_path),
       width(width),
       height(height),
       is_original_size(is_original_size)
     {}
+    ImageData(ImageData&& other) noexcept
+    : source_file_path(std::move(other.source_file_path)),
+      width(other.width),
+      height(other.height),
+      is_original_size(other.is_original_size),
+      size_bytes(other.size_bytes),
+      raw_data(std::move(other.raw_data))
+      {}
+    ~ImageData()
+    {}
+    void operator=(const ImageData&) = delete;
 };
 
 static int get_image_key(
@@ -64,6 +76,8 @@ class ImageDiskReader : public IImageDataReader
 {
 public:
     ImageDiskReader() = delete;
+    ImageDiskReader(const ImageDiskReader&) = delete;
+    void operator=(const ImageDiskReader&) = delete;
     ImageDiskReader(const std::string& source_file_path);
     std::unique_ptr<ImageData> read_image_data(std::vector<std::string>& read_errors);
 
@@ -86,6 +100,8 @@ class ImageDataResizer
 {
 public:
     ImageDataResizer() = delete;
+    ImageDataResizer(const ImageDataResizer&) = delete;
+    void operator=(const ImageDataResizer&) = delete;
     ImageDataResizer(int resize_width, int resize_height);
     std::unique_ptr<ImageData> resize_image_data(const ImageData& in_image_data, std::vector<std::string> resize_errors);
 

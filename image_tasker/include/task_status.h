@@ -38,6 +38,7 @@ struct TaskStatus
     std::vector<std::string> errors;
 
     TaskStatus() = delete;
+    TaskStatus(const TaskStatus&) = delete;
     TaskStatus(
         const std::string& task_id,
         const TaskState state,
@@ -45,12 +46,17 @@ struct TaskStatus
         const std::vector<std::string>& errors)
     : task_id(task_id), state(state), duration(duration), errors(errors)
     {}
-
     TaskStatus(
         const std::string& task_id,
         const TaskState state,
         std::chrono::duration<double> duration)
     : TaskStatus(task_id, state, duration, {})
     {}
+    TaskStatus(TaskStatus &&other) noexcept
+    : task_id(std::move(other.task_id)),
+      state(other.state),
+      duration(other.duration),
+      errors(std::move(other.errors))
+    {}
+    void operator=(const TaskStatus&) = delete;
 };
-

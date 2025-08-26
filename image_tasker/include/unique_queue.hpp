@@ -4,66 +4,73 @@
 #include <memory>
 #include <mutex>
 #include <condition_variable>
-#include <atomic>
+#include <optional>
+#include <thread>
 
 /**
- * @brief TQueue takes and transfer ownership of the entries, once dequeded and 
- * out of scope the entry will be cleaned up.
- * 
- * Not an efficient implementation, not lock free.
+ * @brief Basic threadsafe queue
  */
 template <class T>
 class TQueue
 {
 public:
-    TQueue() : stop_flag(false)
-    {
-        fifo = std::make_unique<std::queue<std::unique_ptr<T>>>();
-    }
+    TQueue() : queue(std::make_unique<std::queue<T>>()), shutdown_flag(false)
+    {}
 
     ~TQueue()
     {
-        stop();
+        shutdown();
     }
 
-    void stop()
+    void shutdown()
     {
-        if (stop_flag.load())
+        if (shutdown_flag.load())
         {
             return;
         }
-        stop_flag.store(true);
+        shutdown_flag.store(true);
         has_entries.notify_all();
     }
 
-    void enqueue(std::unique_ptr<T> entry)
+    void enqueue(T&& entry)
     {
         std::lock_guard<std::mutex> lock(mutex);
-        fifo->push(std::move(entry));
+        queue->push(std::move(entry));
         has_entries.notify_one();
     }
 
-    std::unique_ptr<T> dequeue() const
+    std::optional<T> dequeue()
     {
-        // take ownership of lock and block until an entry is pushed or shutdown
-        std::unique_lock<std::mutex> lock(mutex);
-        has_entries.wait(lock, [this]()
-            {
-                return !fifo->empty() || stop_flag.load();
-            });
-
-        if (stop_flag.load() && fifo->empty())
+        std::optional<T> entry;
+        std::lock_guard<std::mutex> lock(mutex);
+        if (!queue->empty())
         {
-            return std::unique_ptr<T>(nullptr);
+            entry.emplace(std::move(queue->front()));
+            queue->pop();
         }
-        std::unique_ptr<T> entry = std::move(fifo->front());
-        fifo->pop();
         return entry;
     }
 
+    void wait_for_entry_or_shutdown() const
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        has_entries.wait(lock, [this]()
+        {
+            return !queue->empty() || shutdown_flag.load();
+        });
+    }
+
+    void wait_for_entry(std::stop_token stop) const
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        has_entries.wait(lock, stop, [this]()
+        {
+            return !queue->empty();
+        });
+    }
 private:
     mutable std::mutex mutex;
     mutable std::condition_variable has_entries;
-    std::atomic_bool stop_flag;
-    std::unique_ptr<std::queue<std::unique_ptr<T>>> fifo;
+    std::atomic_bool shutdown_flag;
+    std::unique_ptr<std::queue<T>> queue;
 };

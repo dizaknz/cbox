@@ -70,7 +70,7 @@ TEST(ImageManager, Load)
     const int task_pool_size = 4;
     const int request_timeout_ms = 25;
 
-    std::shared_ptr<ImageManager> image_manager = std::make_shared<ImageManager>(
+    std::unique_ptr<ImageManager> image_manager = std::make_unique<ImageManager>(
         image_cache_size_mb,
         task_pool_size,
         request_timeout_ms);
@@ -87,7 +87,7 @@ TEST(ImageManager, Load)
     }
      
     std::this_thread::sleep_for(std::chrono::milliseconds(250)); 
-    status_queue->stop();
+    status_queue->shutdown();
 }
 
 TEST(ImageManager, Resize)
@@ -96,7 +96,7 @@ TEST(ImageManager, Resize)
     const int task_pool_size = 4;
     const int request_timeout_ms = 25;
 
-    std::shared_ptr<ImageManager> image_manager = std::make_shared<ImageManager>(
+    std::unique_ptr<ImageManager> image_manager = std::make_unique<ImageManager>(
         image_cache_size_mb,
         task_pool_size,
         request_timeout_ms);
@@ -113,5 +113,5 @@ TEST(ImageManager, Resize)
     }
      
     std::this_thread::sleep_for(std::chrono::milliseconds(250)); 
-    status_queue->stop();
+    status_queue->shutdown();
 }

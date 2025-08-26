@@ -65,7 +65,7 @@ class ImageCache
 public:
     ImageCache() = delete;
     ImageCache(const ImageCache&) = delete;
-    ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue);
+    ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> image_queue);
     void resize_by(int delta_size_bytes);
     const ImageData& get(int key, bool& found_entry);
 
@@ -73,7 +73,7 @@ private:
     /**
      * @brief run consumes of the image queue and populates cache
      */
-    void run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageData>> result_queue);
+    void run(std::stop_token ctrl, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue);
 
     /**
      * @brief Keep busting least used cache entries until the required space has been freed up
