@@ -7,11 +7,10 @@
 #include <vector>
 #include <string>
 
+#include "image_data.h"
+
 struct TaskStatus;
-struct ImageData;
 template <class T> class TQueue;
-class IImageDataReader;
-class ImageDataResizer;
 
 /**
  * Args for requesting an image
@@ -19,14 +18,49 @@ class ImageDataResizer;
 struct ImageTask
 {
     std::string task_id;
+    // TODO: reader/resizer should be std::function
     std::unique_ptr<IImageDataReader> reader;
     std::unique_ptr<ImageDataResizer> resizer;
     bool auto_resize;
-    int desired_width;
-    int desired_height;
     std::shared_ptr<TQueue<TaskStatus>> status_queue;
-    std::shared_ptr<TQueue<ImageData>> result_queue;
-};
+    std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue;
+
+    ImageTask() = delete;
+    ImageTask(const ImageTask&) = delete;
+    ImageTask(
+        const std::string& task_id,
+        const std::string& source_file,
+        std::shared_ptr<TQueue<TaskStatus>> status_queue,
+        std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue)
+    : task_id(task_id),
+      reader(std::make_unique<ImageDiskReader>(source_file)),
+      auto_resize(false),
+      status_queue(status_queue),
+      result_queue(result_queue)
+    {}
+    ImageTask(
+        const std::string& task_id,
+        const std::string& source_file,
+        int size_x,
+        int size_y,
+        std::shared_ptr<TQueue<TaskStatus>> status_queue,
+        std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue)
+    : task_id(task_id),
+      reader(std::make_unique<ImageDiskReader>(source_file)),
+      resizer(std::make_unique<ImageDataResizer>(size_x, size_y)),
+      auto_resize(true),
+      status_queue(status_queue),
+      result_queue(result_queue)
+    {}
+    ImageTask(ImageTask&& other) noexcept
+    : task_id(std::move(other.task_id)), 
+      reader(std::move(other.reader)),
+      resizer(std::move(other.resizer)),
+      auto_resize(other.auto_resize),
+      status_queue(std::move(other.status_queue)),
+      result_queue(std::move(other.result_queue))
+    {}
+ };
 
 /**
  * Interruptable task runner
@@ -60,7 +94,7 @@ public:
     ImageTaskManager(unsigned int pool_size);
     ~ImageTaskManager();
     void increase_pool_size_by(unsigned int delta_pool_size);
-    void submit_task(ImageTask *const task);
+    void submit_task(ImageTask&& task);
 
 private:
     std::vector<std::unique_ptr<ImageTaskRunner>> runner_pool;

@@ -11,7 +11,7 @@
 
 #include "image_data.h"
 #include "task_status.h"
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_task_manager.h"
 
 using namespace spdlog;
@@ -47,8 +47,9 @@ private:
         }
         while (!ctrl.stop_requested())
         {
-            std::unique_ptr<CacheMetrics> cache_metrics = metrics_queue->dequeue();
-            if (cache_metrics)
+            metrics_queue->wait_for_entry_or_shutdown();
+            std::optional<CacheMetrics> cache_metrics = metrics_queue->dequeue();
+            if (cache_metrics.has_value())
             {
                 info("Cache Metrics - hits: " + std::to_string(cache_metrics->cache_hits)
                      + " misses: " + std::to_string(cache_metrics->cache_misses)
@@ -84,8 +85,9 @@ private:
         }
         while (!ctrl.stop_requested())
         {
-            std::unique_ptr<TaskStatus> task_status = status_queue->dequeue();
-            if (task_status)
+            status_queue->wait_for_entry_or_shutdown();
+            std::optional<TaskStatus> task_status = status_queue->dequeue();
+            if (task_status.has_value())
             {
                 auto elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(task_status->duration);
                 info("Task Status - task: " + task_status->task_id
@@ -102,7 +104,7 @@ private:
 
 class TestImageHandler : public IImageHandler
 {
-    void Process(const ImageData& image_data)
+    void Process(const ImageData& image_data) const
     {
         info("Processing image: " + image_data.source_file_path
              + " Width: " + std::to_string(image_data.width)
@@ -117,7 +119,7 @@ int main(int argc, char **argv)
     // defaults for testing in debugger
     int image_cache_size_mb = 16;
     int task_pool_size = 4;
-    int request_timeout_ms = 250;
+    int request_timeout_ms = 50;
     int width = 612;
     int height = 407;
     std::string image_file_path = std::string(std::filesystem::current_path().string() + "\\..\\tests\\data\\test-image-1.jpg");
@@ -162,7 +164,7 @@ int main(int argc, char **argv)
       
     info("Wait for asyncs to complete");
     std::this_thread::sleep_for(std::chrono::milliseconds(250)); 
-    status_queue->stop();
+    status_queue->shutdown();
 
     info("Done");
 

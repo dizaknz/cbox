@@ -79,7 +79,9 @@
 			"coroutine": "cpp",
 			"resumable": "cpp",
 			"future": "cpp",
-			"filesystem": "cpp"
+			"filesystem": "cpp",
+			"map": "cpp",
+			"xtree": "cpp"
 		}
 	}
 }

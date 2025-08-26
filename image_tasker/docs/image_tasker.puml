@@ -12,13 +12,13 @@ abstract class IImageDataReader {
 
 
 abstract class IImageHandler {
-	+{abstract} Process(const ImageData &) : void
+	+{abstract} Process(const ImageData &) : void {query}
 }
 
 
 class ImageCache {
-	+ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<ImageData>> image_queue)
-	+get(const std::string& image_file_name, int width, int height, bool& found_entry) : ImageData&
+	+ImageCache(unsigned int cache_size_bytes, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> image_queue)
+	+get(int key, bool& found_entry) : ImageData&
 	-cache_thread : std::jthread
 	-used_count : std::map<int, AtomicWrapper<int>>
 	-write_mutex : std::mutex
@@ -29,7 +29,7 @@ class ImageCache {
 	-running_size_bytes : unsigned int
 	-bust_least_used_cache(int required_free_bytes) : void
 	+resize_by(int delta_size_bytes) : void
-	-run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageData>> result_queue) : void
+	-run(std::stop_token ctrl, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue) : void
 }
 
 
@@ -59,9 +59,9 @@ class ImageManager {
 	+ImageManager(int image_cache_size_mb, int task_pool_size, int request_timeout_ms)
 	+~ImageManager()
 	-impl : std::shared_ptr<Impl>
-	+async_request_image_load(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler) : void
-	+async_request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler) : void
 	+register_task_status_queue(std::shared_ptr<TQueue<TaskStatus>> queue) : void
+	+request_image_load(const std::string& image_path, std::shared_ptr<IImageHandler> handler) : void
+	+request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler) : void
 }
 
 
@@ -74,7 +74,7 @@ class ImageTaskManager {
 	-runner_pool : std::vector<std::unique_ptr<ImageTaskRunner>>
 	-pool_size : unsigned int
 	+increase_pool_size_by(unsigned int delta_pool_size) : void
-	+submit_task(ImageTask* const task) : void
+	+submit_task(ImageTask&& task) : void
 }
 
 
@@ -113,7 +113,10 @@ class AtomicWrapper <template<class T>> {
 
 class ImageData {
 	+ImageData()
-	+ImageData(const std::string source_file_path, int width, int height)
+	+ImageData(const std::string source_file_path, int width, int height, bool is_original_size)
+	+ImageData(ImageData&& other)
+	+~ImageData()
+	+is_original_size : bool
 	+channels : int
 	+height : int
 	+key() : int
@@ -125,11 +128,12 @@ class ImageData {
 
 
 class ImageTask {
+	+ImageTask(const std::string& task_id, const std::string& source_file, std::shared_ptr<TQueue<TaskStatus>> status_queue, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue)
+	+ImageTask(const std::string& task_id, const std::string& source_file, int size_x, int size_y, std::shared_ptr<TQueue<TaskStatus>> status_queue, std::shared_ptr<TQueue<std::unique_ptr<ImageData>>> result_queue)
+	+ImageTask(ImageTask&& other)
 	+auto_resize : bool
-	+desired_height : int
-	+desired_width : int
-	+result_queue : std::shared_ptr<TQueue<ImageData>>
 	+status_queue : std::shared_ptr<TQueue<TaskStatus>>
+	+result_queue : std::shared_ptr<TQueue<std::unique_ptr<ImageData>>>
 	+task_id : std::string
 	+reader : std::unique_ptr<IImageDataReader>
 	+resizer : std::unique_ptr<ImageDataResizer>
@@ -139,6 +143,7 @@ class ImageTask {
 class TaskStatus {
 	+TaskStatus(const std::string& task_id, const TaskState state, std::chrono::duration<double> duration, const std::vector<std::string>& errors)
 	+TaskStatus(const std::string& task_id, const TaskState state, std::chrono::duration<double> duration)
+	+TaskStatus(TaskStatus&& other)
 	+state : TaskState
 	+duration : std::chrono::duration<double>
 	+task_id : std::string
@@ -174,7 +179,7 @@ ImageDataTransferer o-- ImageData
 ImageTask o-- IImageDataReader
 
 
-ImageTask *-- ImageData
+ImageTask o-- ImageData
 
 
 ImageTask o-- ImageDataResizer

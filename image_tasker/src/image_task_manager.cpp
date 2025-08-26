@@ -1,5 +1,5 @@
 #include "image_task_manager.h"
-#include "unique_queue.hpp"
+#include "basic_queue.hpp"
 #include "image_data.h"
 #include "task_status.h"
 
@@ -24,8 +24,9 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
     while (!ctrl.stop_requested())
     {
         while(task_running.test_and_set(std::memory_order_acquire));
-        std::unique_ptr<ImageTask> task = task_queue->dequeue();
-        if (task)
+        task_queue->wait_for_entry_or_shutdown();
+        std::optional<ImageTask> task = task_queue->dequeue();
+        if (task.has_value())
         {
             auto start = std::chrono::high_resolution_clock::now();
             if (!task->reader)
@@ -34,7 +35,7 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
                     "Failed running image task, reason: no image reader provided"
                 };
                 auto end = std::chrono::high_resolution_clock::now();
-                report_task_failure(*task.get(), start - end, errors);
+                report_task_failure(*task, start - end, errors);
                 task_running.clear(std::memory_order_release);
                 continue;
             }
@@ -43,7 +44,7 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
             if (read_errors.size() > 0)
             {
                 auto end = std::chrono::high_resolution_clock::now();
-                report_task_failure(*task.get(), end - start, read_errors);
+                report_task_failure(*task, end - start, read_errors);
                 task_running.clear(std::memory_order_release);
                 continue;
             }
@@ -55,7 +56,7 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
                 if (resize_errors.size() > 0)
                 {
                     auto end = std::chrono::high_resolution_clock::now();
-                    report_task_failure(*task.get(), end - start, resize_errors);
+                    report_task_failure(*task, end - start, resize_errors);
                     task_running.clear(std::memory_order_release);
                     continue;
                 }
@@ -63,14 +64,14 @@ void ImageTaskRunner::run(std::stop_token ctrl, std::shared_ptr<TQueue<ImageTask
                 {
                     auto end = std::chrono::high_resolution_clock::now();
                     task->result_queue->enqueue(std::move(resize_result));
-                    report_task_success(*task.get(), end - start);
+                    report_task_success(*task, end - start);
                 }
             }
             if (task->result_queue)
             {
                 auto end = std::chrono::high_resolution_clock::now();
                 task->result_queue->enqueue(std::move(read_result));
-                report_task_success(*task.get(), end - start);
+                report_task_success(*task, end - start);
             }
         }
         task_running.clear(std::memory_order_release);
@@ -90,11 +91,7 @@ void ImageTaskRunner::report_task_failure(const ImageTask& task, std::chrono::du
     {
         return;
     }
-    task.status_queue->enqueue(std::make_unique<TaskStatus>(
-        task.task_id,
-        TaskState::Failed,
-        duration,
-        errors));
+    task.status_queue->enqueue(TaskStatus(task.task_id, TaskState::Failed, duration, errors));
 }
 
 void ImageTaskRunner::report_task_success(const ImageTask& task, std::chrono::duration<double> duration)
@@ -103,10 +100,7 @@ void ImageTaskRunner::report_task_success(const ImageTask& task, std::chrono::du
     {
         return;
     }
-    task.status_queue->enqueue(std::make_unique<TaskStatus>(
-        task.task_id,
-        TaskState::Completed,
-        duration));
+    task.status_queue->enqueue(TaskStatus(task.task_id, TaskState::Completed, duration));
 }
 
 ImageTaskManager::ImageTaskManager() : ImageTaskManager(DEFAULT_POOL_SIZE)
@@ -131,8 +125,7 @@ ImageTaskManager::ImageTaskManager(unsigned int pool_size)
 
 ImageTaskManager::~ImageTaskManager()
 {
-    // workaround for sharing queue
-    task_queue->stop();
+    task_queue->shutdown();
 
     // lock and request tasks in pool to stop by clearing pool
     const std::lock_guard<std::mutex> lock(pool_mutex);
@@ -155,7 +148,7 @@ void ImageTaskManager::increase_pool_size_by(unsigned int delta_pool_size)
     }
 }
 
-void ImageTaskManager::submit_task(ImageTask *const task)
+void ImageTaskManager::submit_task(ImageTask&& task)
 {
-    task_queue->enqueue(std::unique_ptr<ImageTask>(task));
+    task_queue->enqueue(std::move(task));
 }
