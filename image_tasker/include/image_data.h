@@ -21,6 +21,7 @@ struct ImageData
     bool is_original_size = true;
     int size_bytes = 0;
     std::unique_ptr<unsigned char[]> raw_data;
+    bool is_valid = false;
 
     int key()
     {
