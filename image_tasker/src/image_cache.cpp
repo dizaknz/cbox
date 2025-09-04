@@ -47,6 +47,11 @@ const ImageData& ImageCache::get(int key, bool& found_entry)
         return *this->not_found.get();
     }
     found_entry = true;
+    if (used_count.contains(key))
+    {
+        int count = used_count[key].load();
+        used_count[key].store(++count);
+    }
     return *cache_entries[key].get();
 }
 
@@ -77,29 +82,25 @@ void ImageCache::run(std::stop_token ctrl, std::shared_ptr<TQueue<std::unique_pt
 
 void ImageCache::bust_least_used_cache(int required_free_bytes)
 {
-    // TODO: use min priority queue instead
     // check size and keep busting until enough space is left for incoming image
     if (cache_size_bytes - running_size_bytes > required_free_bytes)
     {
         return;
     }
-    std::vector<int> cands;
+
+    std::priority_queue<std::pair<int, int>> cands;
     for (const auto& pair : used_count)
     {
-        if (pair.second.load() == 0)
-        {
-            cands.push_back(pair.first);
-        }
+        cands.push({pair.second.load(), pair.first});
     }
 
-    for (const int cand : cands)
+    while (!cands.empty())
     {
-        {
-            used_count.erase(cand);
-            int busted_size = cache_entries[cand]->size_bytes;
-            cache_entries.erase(cand);
-            running_size_bytes -= busted_size;
-        }
+        int cand = cands.top().second;
+        int busted_size = cache_entries[cand]->size_bytes;
+        cache_entries.erase(cand);
+        running_size_bytes -= busted_size;
+        cands.pop();
         if (cache_size_bytes - running_size_bytes > required_free_bytes)
         {
             break;

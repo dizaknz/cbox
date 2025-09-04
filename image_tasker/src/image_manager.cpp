@@ -62,6 +62,7 @@ public:
                 handler->Process(impl->image_cache->get(key, found_entry));
             }
         });
+        done.wait();
     }
 
     void request_image_resize(const std::string& image_path, int size_x, int size_y, std::shared_ptr<IImageHandler> handler)
@@ -100,7 +101,7 @@ public:
                     {
                         return;
                     }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1)); 
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
                     wait_ms++;
                 }
                 handler->Process(impl->image_cache->get(key, found_entry));
@@ -152,3 +153,5 @@ ImageManager::~ImageManager()
 {
     impl.reset();
 }
+
+

@@ -36,6 +36,7 @@ std::unique_ptr<ImageData> ImageDiskReader::read_image_data(std::vector<std::str
     data->size_bytes = data->width * data->height * data->channels;
     // own the raw memory of image
     data->raw_data = std::unique_ptr<unsigned char[]>(raw_data);
+    data->is_valid = true;
 
     return data;
 }
@@ -108,6 +109,7 @@ std::unique_ptr<ImageData> ImageDataResizer::resize_image_data(const ImageData& 
     resized_data->channels = in_image_data.channels;
     resized_data->size_bytes = resized_data->width * resized_data->height * resized_data->channels;
     resized_data->raw_data = std::unique_ptr<unsigned char[]>(resized_image_data);
- 
+    resized_data->is_valid = true;
+    
     return resized_data;
 }
