@@ -88,7 +88,7 @@ void ImageCache::bust_least_used_cache(int required_free_bytes)
         return;
     }
 
-    std::priority_queue<std::pair<int, int>> cands;
+    std::priority_queue<std::pair<int, int>, std::vector<std::pair<int, int>>, std::greater<std::pair<int, int>>> cands;
     for (const auto& pair : used_count)
     {
         cands.push({pair.second.load(), pair.first});

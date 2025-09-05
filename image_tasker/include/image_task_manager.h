@@ -18,7 +18,6 @@ template <class T> class TQueue;
 struct ImageTask
 {
     std::string task_id;
-    // TODO: reader/resizer should be std::function
     std::unique_ptr<IImageDataReader> reader;
     std::unique_ptr<ImageDataResizer> resizer;
     bool auto_resize;
