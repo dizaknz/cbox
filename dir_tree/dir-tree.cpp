@@ -11,11 +11,14 @@
 #include <string>
 #include <system_error>
 #include <vector>
+#include <string_view>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
+
+inline constexpr std::string_view AppName = "dir-tree";
 
 namespace fs = std::filesystem;
 
@@ -153,7 +156,7 @@ static void walk(const fs::path& dir, const std::string& prefix, int depth, cons
 
 static void printHelp() {
     std::cout <<
-        "Usage: tree [options] [directory]\n"
+        "Usage: " << AppName << " [options] [directory]\n"
         "  -a          Include hidden files\n"
         "  -d          List directories only\n"
         "  -f          Print the full path prefix for each entry\n"
@@ -180,24 +183,31 @@ static bool parseArgs(int argc, char** argv, Options& opt, int& exitCode) {
         }
         else if (arg == "-L") {
             if (i + 1 >= argc) {
-                std::cerr << "tree: option -L requires a level argument\n";
-                exitCode = 1; return false;
+                std::cerr << AppName << ": option -L requires a level argument\n";
+                exitCode = 1;
+                return false;
             }
             try {
                 opt.maxDepth = std::stoi(argv[++i]);
                 if (opt.maxDepth < 1) throw std::out_of_range("");
             } catch (...) {
-                std::cerr << "tree: invalid level for -L\n";
-                exitCode = 1; return false;
+                std::cerr << AppName << ": invalid level " << argv[i] << " provided for -L\n";
+                exitCode = 1;
+                return false;
             }
         }
-        else if (arg == "-h" || arg == "--help") { printHelp(); return false; }
+        else if (arg == "-h" || arg == "--help") { 
+            printHelp(); 
+            return false; 
+        }
         else if (!arg.empty() && arg[0] == '-') {
-            std::cerr << "tree: unknown option '" << arg << "'\n";
-            exitCode = 1; return false;
+            std::cerr << AppName << ": unknown option '" << arg << "'\n";
+            exitCode = 1;
+            return false;
         }
         else opt.root = arg; // treat as the directory to list
     }
+    exitCode = 0;
     return true;
 }
 
@@ -208,8 +218,9 @@ int main(int argc, char** argv) {
     SetConsoleOutputCP(CP_UTF8);
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD mode = 0;
-    if (hOut != INVALID_HANDLE_VALUE && GetConsoleMode(hOut, &mode))
+    if (hOut != INVALID_HANDLE_VALUE && GetConsoleMode(hOut, &mode)) {
         SetConsoleMode(hOut, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
 #endif
 
     Options opt;
@@ -218,7 +229,7 @@ int main(int argc, char** argv) {
 
     std::error_code ec;
     if (!fs::exists(opt.root, ec) || !fs::is_directory(opt.root, ec)) {
-        std::cerr << "tree: '" << opt.root << "' is not a directory\n";
+        std::cerr << AppName << ": '" << opt.root << "' is not a directory\n";
         return 1;
     }
 
