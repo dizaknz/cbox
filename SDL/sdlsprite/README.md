@@ -13,20 +13,52 @@ Switch modes using the following key presses:
 * `n` - next sprite in series, hold to animate sprites at full tick
 * `x` - quits
 
-# Build steps
+# Setup steps
 
 Requires
 
 * `cmake`
 * `conan`
 
+## Conan
+
+Install [conan](https://conan.io/)
+
 ```
-cmake . -DCMAKE_BUILD_TYPE=Release
+pip install conan
+```
+
+Setup profile for build system
+
+```
+conan profile detect --force
+```
+
+## Project setup
+
+Install project depedencies
+
+```
+mkdir build
+conan install . --output-folder=build --build=missing
+```
+
+Setup cmake
+
+```
+cmake -B build -S . -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=./build/conan_provider.cmake
+```
+
+
+# Build steps
+
+```
+cd build
 cmake --build .
 ```
 
 # Run it
 
 ```
-bin/sdlsprite
+build/Debug/sdlsprite
 ```

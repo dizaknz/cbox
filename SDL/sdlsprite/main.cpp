@@ -1,5 +1,6 @@
-#include <SDL.h>
-#include <SDL_image.h>
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3/SDL_events.h>
 #include <iomanip>
 
 #include "sprite.hpp"
@@ -44,16 +45,9 @@ int main(int argc, char ** argv)
     const int listenIdx = 2;
 
     SDL_Init(SDL_INIT_VIDEO);
-    IMG_Init(IMG_INIT_PNG);
 
-    SDL_Window *window = SDL_CreateWindow(
-        "Sprite Animation",
-        SDL_WINDOWPOS_UNDEFINED, 
-        SDL_WINDOWPOS_UNDEFINED,
-        width, 
-        height, 
-        0);
-    SDL_Renderer * renderer = SDL_CreateRenderer(window, -1, 0);
+    SDL_Window *window = SDL_CreateWindow("Sprite Animation", width, height, 0);
+    SDL_Renderer * renderer = SDL_CreateRenderer(window, nullptr);
     SDL_SetRenderDrawColor(renderer, 168, 230, 255, 255);
     SDL_RenderClear(renderer);
 
@@ -83,46 +77,46 @@ int main(int argc, char ** argv)
         {
             switch (event.type)
             {
-                case SDL_KEYDOWN:
+                case SDL_EVENT_KEY_DOWN:
                 {
-                    switch(event.key.keysym.sym)
+                    switch(event.key.key)
                     {
-                        case SDLK_q:
+                        case SDLK_Q:
                             mode = Mode::Quiet;
                             break;
-                        case SDLK_l:
+                        case SDLK_L:
                             mode = Mode::Listen;
                             break;
-                        case SDLK_s:
+                        case SDLK_S:
                             mode = Mode::Speak;
                             break;
-                        case SDLK_p:
+                        case SDLK_P:
                         case SDLK_LEFT:
                             mode = Mode::Previous;
                             break;
-                        case SDLK_n:
+                        case SDLK_N:
                         case SDLK_RIGHT:
                             mode = Mode::Next;
                             break;
-                        case SDLK_x:
+                        case SDLK_X:
                             std::cout << "Good bye" << std::endl;
                             quit = true;
                             break;
                     }
                     break;
                 }
-                case SDL_KEYUP:
-                    switch(event.key.keysym.sym)
+                case SDL_EVENT_KEY_UP:
+                    switch(event.key.key)
                     {
-                        case SDLK_p:
+                        case SDLK_P:
                         case SDLK_LEFT:
-                        case SDLK_n:
+                        case SDLK_N:
                         case SDLK_RIGHT:
                             mode = Mode::Current;
                             break;
                     }
                     break;
-                case SDL_QUIT:
+                case SDL_EVENT_QUIT:
                     quit = true;
                     break;
             }
@@ -153,7 +147,6 @@ int main(int argc, char ** argv)
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-    IMG_Quit();
     SDL_Quit();
 
     return 0;

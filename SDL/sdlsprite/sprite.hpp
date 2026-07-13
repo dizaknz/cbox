@@ -1,7 +1,8 @@
 #pragma once
 
-#include <SDL.h>
-#include <SDL_image.h>
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3/SDL_surface.h>
 #include <atomic>
 #include <iostream>
 #include <ostream>
@@ -11,7 +12,6 @@ class SpeakingSprite
 {
     private:
         SDL_Renderer *renderer;
-        SDL_Surface *image;
         SDL_Texture *texture;
         std::string source;
         int width;
@@ -41,22 +41,24 @@ class SpeakingSprite
             int c = x(idx);
             int r = y(idx);
 
-            SDL_Rect src = { 
-                (width * c) + (gapX * c),
-                (height * r) + (gapY * r),
-                width,
-                height
+            SDL_FRect src = { 
+                (float)((width * c) + (gapX * c)),
+                (float)((height * r) + (gapY * r)),
+                (float)(width),
+                (float)(height)
             };
-            SDL_Rect dest = {
-                0,
-                0, 
-                width, 
-                height
+            const SDL_FRect* src_ptr = &src;
+            SDL_FRect dest = {
+                0.0f,
+                0.0f, 
+                (float)(width),
+                (float)(height)
             };
+            const SDL_FRect* dest_ptr = &dest;
 
             SDL_RenderClear(renderer);
-            auto ret = SDL_RenderCopy(renderer, texture, &src, &dest);
-            if (ret < 0)
+            auto ret = SDL_RenderTexture(renderer, texture, src_ptr, dest_ptr);
+            if (!ret)
             {
                 std::cerr << "ERROR: Fail to copy texture, SDL error: " << SDL_GetError() << std::endl;
                 return;
@@ -94,22 +96,11 @@ class SpeakingSprite
         virtual ~SpeakingSprite()
         {
             SDL_DestroyTexture(texture);
-            SDL_FreeSurface(image);
         }
 
         bool Load()
         {
-            image = IMG_Load(source.c_str());
-            if (image == nullptr)
-            {
-                std::cerr << "ERROR: Could not load spritesheet: "
-                         << source 
-                         << ", SDL error: " 
-                         << SDL_GetError() 
-                         << std::endl;
-                return false;
-            }
-            texture = SDL_CreateTextureFromSurface(renderer, image);
+            texture = IMG_LoadTexture(renderer, source.c_str());
             if (texture == nullptr)
             {
                 std::cerr << "ERROR: Failed to create texture from surface, SDL error: "
@@ -139,7 +130,7 @@ class SpeakingSprite
 
         void Speak()
         {
-            Uint32 ticks = SDL_GetTicks();
+            Uint64 ticks = SDL_GetTicks();
             Uint32 idx = (ticks / 100) % num;
             render(idx);
         }
