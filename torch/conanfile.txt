@@ -1,6 +1,8 @@
 [requires]
-cli11/2.1.1
-spdlog/1.11.0
-
+libtorch/2.9.1
+fmt/10.2.1
 [generators]
-cmake
+CMakeDeps
+CMakeToolchain
+[layout]
+cmake_layout
