@@ -27,37 +27,6 @@ Consumes MQTT events from devices, validates and stores them in MongoDB, and ser
 | `internal/stored/{tenant}` | Fan-out to web service | After MongoDB commit |
 | `internal/dead-letter` | Invalid messages | Decoder/validator failure |
 
-## Processing Flow
-
-```mermaid
-graph TD
-    subgraph ingest
-        mqtt["MQTT<br/>Inbound"]
-        decoder["Hardened<br/>Decoder"]
-        verifier["Verifier<br/>C++ logic"]
-        validator["Semantic<br/>Validator"]
-        mongo[(MongoDB<br/>Idempotent<br/>Upsert)]
-        blob["Blob<br/>RPC"]
-        notify["Internal<br/>Notify"]
-    end
-    
-    mqtt --> decoder
-    decoder --> verifier
-    verifier --> validator
-    validator --> mongo
-    mongo --> blob
-    blob --> notify
-    
-    style mqtt fill:#e1f5ff
-    style decoder fill:#fff3e1
-    style verifier fill:#ffe1e1
-    style validator fill:#e1ffe1
-    style mongo fill:#ffe1e1
-    style blob fill:#f5e1ff
-    style notify fill:#e1ffe1
-```
-
-## Idempotency
 ## Idempotency
 
 All writes are **idempotent upserts**, keyed by:
