@@ -1,3 +1,0 @@
-# recsearch
-
-Basic record search
