@@ -231,30 +231,6 @@ Go templates with vanilla JavaScript:
 
 ## Observability
 
-```mermaid
-gantt
-    title SSE Connection Lifecycle
-    dateFormat  YYYY-MM-DD
-    axisFormat  %H:%M
-    
-    section Connection Setup
-      Initial handshake :active, 2024-01-01 10:00, 2s
-      Keep-alive ping :active, every 15s, 15s
-      
-    section Event Stream
-      Event notification :active, 2024-01-01 10:00:01, 50ms
-      UI update :active, 2024-01-01 10:00:01, 100ms
-      
-    section Recovery
-      Reconnect attempt :active, 2024-01-01 10:30:00, 3s
-      Resume from cursor :active, 2024-01-01 10:30:03, 1s
-      
-    section Performance Targets
-      Event-to-visible latency :crit, < 5s p95
-      SSE message latency :crit, < 100ms
-      Buffer size :crit, 10K messages
-```
-
 | Metric | Description |
 |--------|-------------|
 | `web_connections_total` | Active SSE connections (gauge) |
