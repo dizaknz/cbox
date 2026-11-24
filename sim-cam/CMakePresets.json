@@ -1,0 +1,122 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "host-debug-vs2026",
+      "displayName": "Host Debug (VS 2026)",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolset": "host=x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CAMERA_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "host-debug-vs2022",
+      "displayName": "Host Debug (VS 2022)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolset": "host=x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CAMERA_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "host-debug-vs2019",
+      "displayName": "Host Debug (VS 2019)",
+      "generator": "Visual Studio 16 2019",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolset": "host=x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CAMERA_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "host-debug-ninja",
+      "displayName": "Host Debug (Ninja + cl)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CAMERA_SANITIZERS": "OFF",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
+      "name": "host-debug-clang",
+      "displayName": "Host Debug (Ninja + clang-cl)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CAMERA_SANITIZERS": "OFF",
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_LINKER": "lld-link"
+      }
+    },
+    {
+      "name": "host-release-vs2026",
+      "displayName": "Host Release (VS 2026)",
+      "generator": "Visual Studio 18 2026",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolset": "host=x64",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAMERA_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "yocto",
+      "displayName": "Yocto Cross-Compile",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAMERA_SANITIZERS": "OFF",
+        "CMAKE_TOOLCHAIN_FILE": "$env{OECORE_NATIVE_SYSROOT}/environment-setup-*"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "host-debug-vs2026",
+      "displayName": "Build Host Debug (VS 2026)",
+      "configurePreset": "host-debug-vs2026"
+    },
+    {
+      "name": "host-debug-vs2022",
+      "displayName": "Build Host Debug (VS 2022)",
+      "configurePreset": "host-debug-vs2022"
+    },
+    {
+      "name": "host-debug-vs2019",
+      "displayName": "Build Host Debug (VS 2019)",
+      "configurePreset": "host-debug-vs2019"
+    },
+    {
+      "name": "host-debug-ninja",
+      "displayName": "Build Host Debug (Ninja + cl)",
+      "configurePreset": "host-debug-ninja"
+    },
+    {
+      "name": "host-debug-clang",
+      "displayName": "Build Host Debug (Ninja + clang-cl)",
+      "configurePreset": "host-debug-clang"
+    },
+    {
+      "name": "host-release-vs2026",
+      "displayName": "Build Host Release (VS 2026)",
+      "configurePreset": "host-release-vs2026"
+    },
+    {
+      "name": "yocto",
+      "displayName": "Build Yocto",
+      "configurePreset": "yocto"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 120 # Allows up to 120 characters before wrapping
+
+# Keeps the standard block indentation style
+AlignAfterOpenBracket: BlockIndent
+
+# NOTE: Windows-specific include blocks use `// clang-format off/on` to preserve
+# the required ordering: winsock2.h must come BEFORE windows.h, and
+# WIN32_LEAN_AND_MEAN must be defined before either. This prevents the legacy
+# winsock.h from conflicting with winsock2.h (C2011 struct redefinition errors).
