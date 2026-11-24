@@ -1,0 +1,50 @@
+include "common.fbs";
+include "bus.fbs";
+include "events.fbs";
+include "media.fbs";
+include "link.fbs";
+include "control.fbs";
+include "ota.fbs";
+namespace camera.v1;
+
+// ── Top-level message wrapper (wire and local bus) ────────────────
+// New members are appended at the end only. Never reorder or remove.
+
+union Payload {
+  // Handshake
+  Hello, Subscribe, Ack,
+
+  // Event pipeline
+  SensorTriggered, EventRaised,
+  RecordClip, ClipReady, ClipFailed, ClipEvicted, ClipUploaded, UploadFailed,
+
+  // Blob URL RPC
+  BlobUrlRequest, BlobUrlGranted, BlobUrlDenied,
+
+  // Link state & health
+  LinkStateChanged, DeviceStatus, HealthReport, DeviceHeartbeat,
+
+  // Control plane
+  DesiredState, ConfigUpdated, ConfigApplied, CaptureNow, RebootDevice, CommandResult,
+
+  // OTA
+  UpdateManifestReceived, UpdateStatus,
+  QuiesceRequest, QuiesceReady, ActivityQuery, ActivityReport
+}
+
+table Envelope {
+  schema_version: ushort = 1;
+  message_id: Uuid;
+  correlation_id: Uuid;               // event id for event-driven chains
+  device_id: Uuid;
+  tenant_id: Uuid;
+  boot_id: Uuid;
+  sent: Clock;
+  clock_synced: bool;
+  priority: Priority;
+  source: ServiceId;
+  payload: Payload;
+}
+
+root_type Envelope;
+file_identifier "CAM1";

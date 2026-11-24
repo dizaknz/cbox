@@ -1,0 +1,117 @@
+include "common.fbs";
+namespace camera.v1;
+
+// ── Blob URL RPC types ────────────────────────────────────────────
+
+enum BlobPurpose : ubyte {
+  Unknown         = 0,
+  ClipUpload      = 1,
+  FirmwareDownload = 2
+}
+
+enum HttpMethod : ubyte {
+  Unknown = 0,
+  Get     = 1,
+  Put     = 2
+}
+
+enum BlobDenyReason : ubyte {
+  Unknown       = 0,
+  UnknownReference = 1,
+  TooLarge      = 2,
+  QuotaExceeded = 3,
+  DeviceRevoked = 4,
+  RateLimited   = 5
+}
+
+enum LinkState : ubyte {
+  Unknown     = 0,
+  Disconnected = 1,
+  Connecting  = 2,
+  Draining    = 3,
+  Live        = 4,
+  Backoff     = 5
+}
+
+// ── BlobUrlRequest: uploadd/otad → linkd → cloud (reliable) ───────
+
+table BlobUrlRequest {
+  request_id: Uuid;
+  purpose: BlobPurpose;
+  ref_id: Uuid;              // clip_id or update_id
+  size_bytes: ulong;         // uploads: exact size; downloads: 0
+  content_type: string;
+  sha256: [ubyte];           // uploads: bound into the signed URL
+}
+
+// ── BlobUrlGranted: cloud → linkd → requester (reliable) ──────────
+
+table BlobUrlGranted {
+  request_id: Uuid;
+  method: HttpMethod;
+  url: string;
+  headers: [KeyValue];       // must be sent verbatim (content type, checksum)
+  ttl_s: uint;               // relative validity, measured from receipt
+  max_bytes: ulong;
+}
+
+// ── BlobUrlDenied: cloud → linkd → requester (reliable) ───────────
+
+table BlobUrlDenied {
+  request_id: Uuid;
+  reason: BlobDenyReason;
+  retry_after_ms: uint;
+}
+
+// ── LinkStateChanged: linkd → all services (notify, replayed on subscribe) ──
+
+table LinkStateChanged {
+  state: LinkState;
+  since: Clock;
+  outbox_depth: uint;
+  reason: string;
+}
+
+// ── DeviceStatus: linkd → cloud (retained + last-will) ────────────
+
+table DeviceStatus {
+  online: bool;
+  firmware_version: string;
+  boot_id: Uuid;
+}
+
+// ── HealthReport: each service → linkd (notify) ───────────────────
+
+table HealthReport {
+  service: ServiceId;
+  state: ServiceState;
+  rss_kb: uint;
+  uptime_s: uint;
+  restarts: ushort;
+  queue_depth: uint;
+  detail: string;
+  counters: [Counter];
+}
+
+// ── StorageStats (embedded in heartbeat) ───────────────────────────
+
+table StorageStats {
+  spool_used_mb: uint;
+  spool_quota_mb: uint;
+  outbox_used_kb: uint;
+  data_free_mb: uint;
+}
+
+// ── DeviceHeartbeat: linkd → cloud (reliable) ─────────────────────
+
+table DeviceHeartbeat {
+  firmware_version: string;
+  active_slot: string;
+  boot_id: Uuid;
+  uptime_s: uint;
+  config_version: uint;
+  clock_synced: bool;
+  link_state: LinkState;
+  storage: StorageStats;
+  services: [HealthReport];
+}

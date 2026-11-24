@@ -1,0 +1,82 @@
+include "common.fbs";
+include "ota.fbs";
+namespace camera.v1;
+
+// ── Command status ────────────────────────────────────────────────
+
+enum CommandStatus : ubyte {
+  Unknown   = 0,
+  Accepted  = 1,
+  Completed = 2,
+  Rejected  = 3,
+  Expired   = 4,
+  Duplicate = 5,
+  Failed    = 6
+}
+
+// ── Camera settings (part of DesiredState) ────────────────────────
+
+table CameraSettings {
+  motion_enabled: bool = true;
+  motion_sensitivity: ubyte = 50;
+  motion_cooldown_s: ushort = 30;
+  pre_roll_ms: uint = 3000;
+  post_roll_ms: uint = 7000;
+  clip_max_bytes: uint = 10485760;     // 10 MB
+  spool_quota_mb: uint = 256;
+  upload_rate_cap_kbps: uint = 0;      // 0 = unlimited
+  heartbeat_interval_s: ushort = 300;
+  telemetry_enabled: bool = true;
+}
+
+// ── DesiredState: cloud → linkd (retained, published on down/desired) ──
+
+table DesiredState {
+  config_version: uint;
+  settings: CameraSettings;
+  update: SignedManifest;              // absent when no update is assigned
+}
+
+// ── ConfigUpdated: linkd → all services (notify, replayed on subscribe) ──
+
+table ConfigUpdated {
+  config_version: uint;
+  settings: CameraSettings;
+}
+
+// ── ConfigApplied: each service → linkd (reliable) ────────────────
+
+table ConfigApplied {
+  config_version: uint;
+  service: ServiceId;
+  ok: bool;
+  detail: string;
+}
+
+// ── CaptureNow: cloud → linkd → eventd (reliable, expiring command) ──
+
+table CaptureNow {
+  command_id: Uuid;
+  issued_wall_ms: long;
+  expires_wall_ms: long;
+  pre_roll_ms: uint;
+  post_roll_ms: uint;
+  reason: string;
+}
+
+// ── RebootDevice: cloud → linkd → otad (reliable, expiring command) ──
+
+table RebootDevice {
+  command_id: Uuid;
+  issued_wall_ms: long;
+  expires_wall_ms: long;
+  reason: string;
+}
+
+// ── CommandResult: linkd → cloud (reliable) ───────────────────────
+
+table CommandResult {
+  command_id: Uuid;
+  status: CommandStatus;
+  detail: string;
+}

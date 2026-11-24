@@ -1,0 +1,24 @@
+include "common.fbs";
+namespace camera.v1;
+
+// ── Handshake messages (local bus only) ───────────────────────────
+
+table Hello {
+  service: ServiceId;
+  schema_version: ushort;
+  pid: uint;
+}
+
+// payload_types lists the union discriminant values the subscriber wants.
+table Subscribe {
+  payload_types: [ubyte];
+  replay_state: bool = true;
+}
+
+// ── Acknowledgement ───────────────────────────────────────────────
+
+table Ack {
+  acked_message_id: Uuid;
+  status: AckStatus;
+  detail: string;
+}

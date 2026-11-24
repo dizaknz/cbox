@@ -1,0 +1,41 @@
+include "common.fbs";
+namespace camera.v1;
+
+// ── Sensor input types ────────────────────────────────────────────
+
+enum SensorKind : ubyte {
+  Unknown           = 0,
+  Motion            = 1,
+  DoorbellPress     = 2
+}
+
+// ── Event types (after policy is applied) ─────────────────────────
+
+enum EventType : ubyte {
+  Unknown  = 0,
+  Motion   = 1,
+  Doorbell = 2,
+  Manual   = 3
+}
+
+// ── SensorTriggered: sensord → eventd (reliable) ─────────────────
+
+table SensorTriggered {
+  sensor_id: ushort;
+  kind: SensorKind;
+  observed: Clock;
+  edge_count: ubyte = 1;    // debounced edges folded into this trigger
+}
+
+// ── EventRaised: eventd → linkd (reliable) ────────────────────────
+
+table EventRaised {
+  event_id: Uuid;
+  event_type: EventType;
+  occurred: Clock;
+  clip_id: Uuid;
+  has_clip: bool = true;
+  sensor_id: ushort;
+  suppressed_count: ushort;  // triggers dropped by cooldown since prev event of same type
+  attributes: [KeyValue];
+}

@@ -1,0 +1,56 @@
+namespace camera.v1;
+
+// ── Core value types ──────────────────────────────────────────────
+
+struct Uuid  { hi:ulong; lo:ulong; }
+struct Clock { mono_ns:ulong; wall_ms:long; }
+
+// ── Priorities ────────────────────────────────────────────────────
+// P0 > P1 > P2. Under queue pressure P2 is dropped first, P0 never.
+
+enum Priority : ubyte { Unknown = 0, P0Critical = 1, P1Normal = 2, P2Bulk = 3 }
+
+// ── Service identities ────────────────────────────────────────────
+
+enum ServiceId : ubyte {
+  Unknown = 0,
+  Sensord = 1,
+  Eventd  = 2,
+  Mediad  = 3,
+  Uploadd = 4,
+  Linkd   = 5,
+  Otad    = 6,
+  Cloud   = 7
+}
+
+// ── Service states ────────────────────────────────────────────────
+
+enum ServiceState : ubyte {
+  Unknown    = 0,
+  Starting   = 1,
+  Healthy    = 2,
+  Degraded   = 3,
+  Stopping   = 4
+}
+
+// ── Ack status ────────────────────────────────────────────────────
+
+enum AckStatus : ubyte {
+  Unknown    = 0,
+  Accepted   = 1,
+  Duplicate  = 2,
+  Rejected   = 3,
+  Busy       = 4
+}
+
+// ── Generic key-value and counters ────────────────────────────────
+
+table KeyValue {
+  key: string;
+  value: string;
+}
+
+table Counter {
+  name: string;
+  value: ulong;
+}

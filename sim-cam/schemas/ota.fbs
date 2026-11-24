@@ -1,0 +1,125 @@
+include "common.fbs";
+namespace camera.v1;
+
+// ── Signature algorithm ───────────────────────────────────────────
+
+enum SigAlg : ubyte {
+  Unknown = 0,
+  Ed25519 = 1
+}
+
+// ── Update lifecycle states ───────────────────────────────────────
+
+enum UpdateState : ubyte {
+  Unknown       = 0,
+  Idle          = 1,
+  Validating    = 2,
+  WaitingForIdle = 3,
+  Downloading   = 4,
+  Verifying     = 5,
+  Installing    = 6,
+  Quiescing     = 7,
+  Rebooting     = 8,
+  TrialBoot     = 9,
+  Committed     = 10,
+  RolledBack    = 11,
+  Failed        = 12
+}
+
+// ── Update failure reasons ────────────────────────────────────────
+
+enum UpdateFailureReason : ubyte {
+  Unknown           = 0,
+  BadSignature      = 1,
+  Incompatible      = 2,
+  DowngradeRefused  = 3,
+  NoSpace           = 4,
+  DownloadFailed    = 5,
+  HashMismatch      = 6,
+  InstallFailed     = 7,
+  HealthCheckFailed = 8,
+  BootFailed        = 9,
+  DeadlineExceeded  = 10
+}
+
+// ── Quiesce reasons ───────────────────────────────────────────────
+
+enum QuiesceReason : ubyte {
+  Unknown = 0,
+  Update  = 1,
+  Reboot  = 2
+}
+
+// ── UpdateManifestBody (serialized once by release signer) ────────
+// The signature covers exactly these bytes.
+
+table UpdateManifestBody {
+  update_id: Uuid;
+  version: string;
+  hardware_ids: [string];
+  min_source_version: string;
+  anti_rollback_counter: uint;
+  image_ref: string;                 // opaque object key, resolved via BlobUrlRequest
+  image_size: ulong;
+  image_sha256: [ubyte];
+  is_delta: bool;
+  delta_base_version: string;
+  install_deadline_wall_ms: long;    // 0 = no deadline
+  cohort: string;
+}
+
+// ── SignedManifest wrapper ────────────────────────────────────────
+
+table SignedManifest {
+  body: [ubyte] (nested_flatbuffer: "UpdateManifestBody");
+  alg: SigAlg;
+  key_id: string;
+  signature: [ubyte];
+}
+
+// ── UpdateManifestReceived: linkd → otad (reliable) ───────────────
+
+table UpdateManifestReceived {
+  manifest: SignedManifest;
+}
+
+// ── UpdateStatus: otad → linkd → cloud (reliable) ─────────────────
+
+table UpdateStatus {
+  update_id: Uuid;
+  state: UpdateState;
+  progress_pct: ubyte;
+  bytes_done: ulong;
+  from_version: string;
+  to_version: string;
+  reason: UpdateFailureReason;
+  detail: string;
+}
+
+// ── QuiesceRequest / QuiesceReady (otad ↔ all services) ───────────
+
+table QuiesceRequest {
+  request_id: Uuid;
+  reason: QuiesceReason;
+  deadline_ms: uint;
+}
+
+table QuiesceReady {
+  request_id: Uuid;
+  service: ServiceId;
+  state_flushed: bool;
+}
+
+// ── ActivityQuery / ActivityReport (otad ↔ eventd) ────────────────
+
+table ActivityQuery {
+  request_id: Uuid;
+}
+
+table ActivityReport {
+  request_id: Uuid;
+  busy: bool;
+  in_flight_events: ushort;
+  in_flight_clips: ushort;
+  idle_hint_ms: uint;
+}

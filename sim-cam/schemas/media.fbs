@@ -1,0 +1,96 @@
+include "common.fbs";
+namespace camera.v1;
+
+// ── Failure / eviction reasons ────────────────────────────────────
+
+enum ClipFailureReason : ubyte {
+  Unknown       = 0,
+  EncoderError  = 1,
+  NoSpace       = 2,
+  Timeout       = 3,
+  Cancelled     = 4
+}
+
+enum EvictionReason : ubyte {
+  Unknown                = 0,
+  QuotaPressure          = 1,
+  Expired                = 2,
+  RetryBudgetExhausted   = 3
+}
+
+enum UploadFailureReason : ubyte {
+  Unknown                = 0,
+  RetryBudgetExhausted   = 1,
+  UrlDenied              = 2,
+  PermanentHttpError     = 3,
+  ChecksumMismatch       = 4,
+  LocalFileMissing       = 5,
+  Expired                = 6
+}
+
+// ── RecordClip: eventd → mediad (reliable) ────────────────────────
+
+table RecordClip {
+  clip_id: Uuid;
+  event_id: Uuid;
+  pre_roll_ms: uint;
+  post_roll_ms: uint;
+  max_bytes: uint;
+}
+
+// ── ClipReady: mediad → uploadd (reliable, transfers file ownership) ──
+
+table ClipReady {
+  clip_id: Uuid;
+  event_id: Uuid;
+  path: string;              // ownership of the file transfers with this message
+  size_bytes: ulong;
+  sha256: [ubyte];           // exactly 32 bytes, checked on receipt
+  duration_ms: uint;
+  content_type: string;
+  created: Clock;
+  priority: Priority;        // inherited from the event
+}
+
+// ── ClipFailed: mediad → linkd (reliable) ─────────────────────────
+
+table ClipFailed {
+  clip_id: Uuid;
+  event_id: Uuid;
+  reason: ClipFailureReason;
+  detail: string;
+}
+
+// ── ClipEvicted: uploadd → linkd (reliable) ───────────────────────
+
+table ClipEvicted {
+  clip_id: Uuid;
+  event_id: Uuid;
+  reason: EvictionReason;
+  size_bytes: ulong;
+}
+
+// ── ClipUploaded: uploadd → linkd (reliable, also notify to eventd) ──
+
+table ClipUploaded {
+  clip_id: Uuid;
+  event_id: Uuid;
+  bytes_uploaded: ulong;
+  etag: string;
+  attempts: ushort;
+  completed: Clock;
+}
+
+// ── UploadFailed: uploadd → linkd (reliable) ──────────────────────
+
+table UploadFailed {
+  clip_id: Uuid;
+  event_id: Uuid;
+  reason: UploadFailureReason;
+  attempts: ushort;
+  last_http_status: short;
+  last_error: string;
+  first_attempt: Clock;
+  last_attempt: Clock;
+  clip_retained: bool;
+}
